@@ -1,59 +1,55 @@
 // Vercel Serverless Function to handle admin panel settings
 // This will be deployed as an API endpoint at /api/settings
 
-// Import Node.js file system module for data persistence
-const fs = require('fs');
-const path = require('path');
+// Import Edge Config client
+import { getData, setData } from './edge-config';
 
-// Path to our data file in /tmp (writable on Vercel)
-const DATA_FILE = path.join('/tmp', 'admin-settings.json');
-
-// Helper to read settings from file
-const readSettings = () => {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = fs.readFileSync(DATA_FILE, 'utf8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Error reading settings file:', error);
-  }
-  // Default settings if file doesn't exist or there's an error
-  return {
-    adminPassword: 'admin@123',
-    businessInfo: {
-      name: 'Mahatma Enterprise',
-      address: '123 Tech Street, Digital City, 12345',
-      phone: '+1 (555) 123-4567',
-      email: 'info@mahatmaenterprise.com',
-      hours: 'Monday - Friday: 9am - 6pm\nSaturday: 10am - 4pm\nSunday: Closed'
-    },
-    socialMedia: {
-      facebook: 'https://facebook.com/',
-      twitter: 'https://twitter.com/',
-      instagram: 'https://instagram.com/',
-      linkedin: 'https://linkedin.com/'
-    },
-    lastUpdated: new Date().toISOString()
-  };
+// Default settings if none exist in the database
+const DEFAULT_SETTINGS = {
+  adminPassword: 'admin@123',
+  businessInfo: {
+    name: 'Mahatma Enterprise',
+    address: '123 Tech Street, Digital City, 12345',
+    phone: '+1 (555) 123-4567',
+    email: 'info@mahatmaenterprise.com',
+    hours: 'Monday - Friday: 9am - 6pm\nSaturday: 10am - 4pm\nSunday: Closed'
+  },
+  socialMedia: {
+    facebook: 'https://facebook.com/',
+    twitter: 'https://twitter.com/',
+    instagram: 'https://instagram.com/',
+    linkedin: 'https://linkedin.com/'
+  },
+  lastUpdated: new Date().toISOString()
 };
 
-// Helper to write settings to file
-const writeSettings = (data) => {
+// Helper to read settings from Edge Config
+const readSettings = async () => {
+  try {
+    const settings = await getData('settings');
+    return settings || DEFAULT_SETTINGS;
+  } catch (error) {
+    console.error('Error reading settings:', error);
+    return DEFAULT_SETTINGS;
+  }
+};
+
+// Helper to write settings to Edge Config
+const writeSettings = async (data) => {
   try {
     // Ensure we only save what we expect to save
-    const current = readSettings();
+    const current = await readSettings();
     const newData = { ...current, ...data, lastUpdated: new Date().toISOString() };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(newData, null, 2));
+    await setData('settings', newData);
     return true;
   } catch (error) {
-    console.error('Error writing settings file:', error);
+    console.error('Error writing settings:', error);
     return false;
   }
 };
 
 // Main function that handles HTTP requests
-module.exports = (req, res) => {
+export default async function handler(req, res) {
   // Set CORS headers to allow your website to call this API
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
@@ -66,12 +62,17 @@ module.exports = (req, res) => {
   
   // Handle GET request - return current settings
   if (req.method === 'GET') {
-    const settings = readSettings();
-    
-    // Don't send the admin password in the response
-    const { adminPassword, ...safeSettings } = settings;
-    
-    return res.status(200).json(safeSettings);
+    try {
+      const settings = await readSettings();
+      
+      // Don't send the admin password in the response
+      const { adminPassword, ...safeSettings } = settings;
+      
+      return res.status(200).json(safeSettings);
+    } catch (error) {
+      console.error('Error reading settings:', error);
+      return res.status(500).json({ error: 'Failed to retrieve settings' });
+    }
   }
   
   // Handle POST request - update settings
@@ -86,7 +87,7 @@ module.exports = (req, res) => {
       
       // Handle password update separately with verification
       if (data.password) {
-        const settings = readSettings();
+        const settings = await readSettings();
         
         // Verify current password before allowing update
         if (data.currentPassword !== settings.adminPassword) {
@@ -94,14 +95,13 @@ module.exports = (req, res) => {
         }
         
         // Update password
-        settings.adminPassword = data.password;
-        writeSettings(settings);
+        await writeSettings({ adminPassword: data.password });
         
         return res.status(200).json({ success: true, message: 'Password updated successfully' });
       }
       
       // Handle other settings updates
-      const success = writeSettings(data);
+      const success = await writeSettings(data);
       
       if (success) {
         return res.status(200).json({ success: true, message: 'Settings updated successfully' });
@@ -116,4 +116,4 @@ module.exports = (req, res) => {
   
   // Handle unsupported methods
   return res.status(405).json({ error: 'Method not allowed' });
-}; 
+} 

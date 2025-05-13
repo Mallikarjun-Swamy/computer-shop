@@ -42,7 +42,6 @@ document.addEventListener('DOMContentLoaded', function() {
         businessInfoForm.addEventListener('submit', function(e) {
             e.preventDefault();
             saveBusinessInfo();
-            showNotification('Business information saved successfully');
         });
     }
     
@@ -56,7 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
         socialMediaForm.addEventListener('submit', function(e) {
             e.preventDefault();
             saveSocialMedia();
-            showNotification('Social media links saved successfully');
         });
     }
 
@@ -72,49 +70,35 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Validate passwords
             if (!currentPassword || !newPassword || !confirmPassword) {
-                alert('Please fill in all password fields');
+                showNotification('Please fill in all password fields', 'error');
                 return;
             }
             
             if (newPassword !== confirmPassword) {
-                alert('New password and confirmation do not match');
+                showNotification('New password and confirmation do not match', 'error');
                 return;
             }
             
             // Check for minimum password strength
             if (newPassword.length < 6) {
-                alert('New password must be at least 6 characters long');
+                showNotification('New password must be at least 6 characters long', 'error');
                 return;
             }
             
             // Show loading state
             const submitBtn = adminPasswordForm.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.textContent;
-            submitBtn.textContent = 'Changing Password...';
-            submitBtn.disabled = true;
+            setLoadingState(submitBtn, true, 'Changing Password...');
             
             // First try API endpoint
-            fetch('/api/settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    currentPassword: currentPassword,
-                    password: newPassword
-                })
+            apiRequest('/api/settings', 'POST', {
+                currentPassword: currentPassword,
+                password: newPassword
             })
-            .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    // Also update in localStorage as fallback
-                    localStorage.setItem('adminPassword', newPassword);
-                    
-                    showNotification('Password changed successfully');
-                    adminPasswordForm.reset();
-                } else {
-                    throw new Error(data.error || 'Failed to change password');
-                }
+                // Also update in localStorage as fallback
+                localStorage.setItem('adminPassword', newPassword);
+                showNotification('Password changed successfully');
+                adminPasswordForm.reset();
             })
             .catch(error => {
                 console.error('Error updating password via API:', error);
@@ -124,13 +108,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     showNotification('Password changed successfully (local only)');
                     adminPasswordForm.reset();
                 } else {
-                    alert('Current password is incorrect');
+                    showNotification('Current password is incorrect', 'error');
                 }
             })
             .finally(() => {
                 // Reset button state
-                submitBtn.textContent = originalBtnText;
-                submitBtn.disabled = false;
+                setLoadingState(submitBtn, false);
             });
         });
     }
@@ -145,36 +128,114 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeMapSettings();
 });
 
-// Business Information Functions
-function loadBusinessInfo() {
-    // Try to get data from API first
-    fetch('/api/settings')
-        .then(response => response.json())
-        .then(data => {
-            if (data.businessInfo) {
-                const businessInfo = data.businessInfo;
-                if (businessInfo.name) document.getElementById('businessName').value = businessInfo.name;
-                if (businessInfo.address) document.getElementById('businessAddress').value = businessInfo.address;
-                if (businessInfo.phone) document.getElementById('businessPhone').value = businessInfo.phone;
-                if (businessInfo.email) document.getElementById('businessEmail').value = businessInfo.email;
-                if (businessInfo.hours) document.getElementById('businessHours').value = businessInfo.hours;
-            }
-        })
-        .catch(error => {
-            console.error('Error loading business info from API:', error);
-            
-            // Fall back to localStorage if API fails
-            const businessInfo = JSON.parse(localStorage.getItem('businessInfo')) || {};
-            
-            if (businessInfo.name) document.getElementById('businessName').value = businessInfo.name;
-            if (businessInfo.address) document.getElementById('businessAddress').value = businessInfo.address;
-            if (businessInfo.phone) document.getElementById('businessPhone').value = businessInfo.phone;
-            if (businessInfo.email) document.getElementById('businessEmail').value = businessInfo.email;
-            if (businessInfo.hours) document.getElementById('businessHours').value = businessInfo.hours;
-        });
+// API Request Utilities
+async function apiRequest(endpoint, method = 'GET', data = null) {
+    const options = {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    };
+    
+    if (data && (method === 'POST' || method === 'PUT')) {
+        options.body = JSON.stringify(data);
+    }
+    
+    try {
+        const response = await fetch(endpoint, options);
+        const responseData = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(responseData.error || `API request failed with status ${response.status}`);
+        }
+        
+        return responseData;
+    } catch (error) {
+        console.error(`API request to ${endpoint} failed:`, error);
+        throw error;
+    }
 }
 
-function saveBusinessInfo() {
+// UI Utility Functions
+function setLoadingState(button, isLoading, loadingText = 'Loading...') {
+    if (!button) return;
+    
+    if (!button._originalText) {
+        button._originalText = button.textContent;
+    }
+    
+    if (isLoading) {
+        button.textContent = loadingText;
+        button.disabled = true;
+    } else {
+        button.textContent = button._originalText;
+        button.disabled = false;
+    }
+}
+
+function showNotification(message, type = 'success') {
+    const notification = document.getElementById('notification');
+    if (!notification) return;
+    
+    notification.textContent = message;
+    notification.className = 'notification';
+    notification.classList.add(type);
+    notification.style.display = 'block';
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 3000);
+}
+
+// Data Storage Utilities
+async function fetchWithFallback(apiEndpoint, localStorageKey, defaultValue = {}) {
+    try {
+        const data = await apiRequest(apiEndpoint);
+        return data;
+    } catch (error) {
+        console.warn(`API request failed, falling back to localStorage for ${localStorageKey}`);
+        return JSON.parse(localStorage.getItem(localStorageKey)) || defaultValue;
+    }
+}
+
+async function saveWithFallback(apiEndpoint, localStorageKey, data) {
+    try {
+        await apiRequest(apiEndpoint, 'POST', data);
+        // Also save to localStorage as fallback
+        localStorage.setItem(localStorageKey, JSON.stringify(data));
+        showNotification('Changes saved successfully');
+        return true;
+    } catch (error) {
+        console.warn(`API save failed, saving to localStorage only for ${localStorageKey}`);
+        localStorage.setItem(localStorageKey, JSON.stringify(data));
+        showNotification('Changes saved locally only', 'warning');
+        return false;
+    }
+}
+
+// Business Information Functions
+async function loadBusinessInfo() {
+    try {
+        const data = await fetchWithFallback('/api/settings', 'businessInfo', {});
+        const businessInfo = data.businessInfo || {};
+        
+        // Fill in form fields
+        document.getElementById('businessName').value = businessInfo.name || '';
+        document.getElementById('businessAddress').value = businessInfo.address || '';
+        document.getElementById('businessPhone').value = businessInfo.phone || '';
+        document.getElementById('businessEmail').value = businessInfo.email || '';
+        document.getElementById('businessHours').value = businessInfo.hours || '';
+    } catch (error) {
+        console.error('Failed to load business info:', error);
+        showNotification('Failed to load business information', 'error');
+    }
+}
+
+async function saveBusinessInfo() {
+    const submitBtn = document.querySelector('#businessInfoForm button[type="submit"]');
+    setLoadingState(submitBtn, true, 'Saving...');
+    
     const businessInfo = {
         name: document.getElementById('businessName').value,
         address: document.getElementById('businessAddress').value,
@@ -183,59 +244,37 @@ function saveBusinessInfo() {
         hours: document.getElementById('businessHours').value
     };
     
-    // Save to API first
-    fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ businessInfo })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to save business info');
-        }
-    })
-    .catch(error => {
-        console.error('Error saving business info to API:', error);
-        // Show a notification that it was saved locally only
-        showNotification('Business information saved locally only. Some server error occurred.');
-    })
-    .finally(() => {
-        // Also save to localStorage as a fallback
-        localStorage.setItem('businessInfo', JSON.stringify(businessInfo));
-    });
+    try {
+        await saveWithFallback('/api/settings', 'businessInfo', { businessInfo });
+    } catch (error) {
+        console.error('Failed to save business info:', error);
+        showNotification('Failed to save business information', 'error');
+    } finally {
+        setLoadingState(submitBtn, false);
+    }
 }
 
 // Social Media Functions
-function loadSocialMedia() {
-    // Try to get data from API first
-    fetch('/api/settings')
-        .then(response => response.json())
-        .then(data => {
-            if (data.socialMedia) {
-                const socialMedia = data.socialMedia;
-                if (socialMedia.facebook) document.getElementById('facebookLink').value = socialMedia.facebook;
-                if (socialMedia.twitter) document.getElementById('twitterLink').value = socialMedia.twitter;
-                if (socialMedia.instagram) document.getElementById('instagramLink').value = socialMedia.instagram;
-                if (socialMedia.linkedin) document.getElementById('linkedinLink').value = socialMedia.linkedin;
-            }
-        })
-        .catch(error => {
-            console.error('Error loading social media from API:', error);
-            
-            // Fall back to localStorage if API fails
-            const socialMedia = JSON.parse(localStorage.getItem('socialMedia')) || {};
-            
-            if (socialMedia.facebook) document.getElementById('facebookLink').value = socialMedia.facebook;
-            if (socialMedia.twitter) document.getElementById('twitterLink').value = socialMedia.twitter;
-            if (socialMedia.instagram) document.getElementById('instagramLink').value = socialMedia.instagram;
-            if (socialMedia.linkedin) document.getElementById('linkedinLink').value = socialMedia.linkedin;
-        });
+async function loadSocialMedia() {
+    try {
+        const data = await fetchWithFallback('/api/settings', 'socialMedia', {});
+        const socialMedia = data.socialMedia || {};
+        
+        // Fill in form fields
+        document.getElementById('facebookLink').value = socialMedia.facebook || '';
+        document.getElementById('twitterLink').value = socialMedia.twitter || '';
+        document.getElementById('instagramLink').value = socialMedia.instagram || '';
+        document.getElementById('linkedinLink').value = socialMedia.linkedin || '';
+    } catch (error) {
+        console.error('Failed to load social media links:', error);
+        showNotification('Failed to load social media links', 'error');
+    }
 }
 
-function saveSocialMedia() {
+async function saveSocialMedia() {
+    const submitBtn = document.querySelector('#socialMediaForm button[type="submit"]');
+    setLoadingState(submitBtn, true, 'Saving...');
+    
     const socialMedia = {
         facebook: document.getElementById('facebookLink').value,
         twitter: document.getElementById('twitterLink').value,
@@ -243,941 +282,648 @@ function saveSocialMedia() {
         linkedin: document.getElementById('linkedinLink').value
     };
     
-    // Save to API first
-    fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ socialMedia })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to save social media');
-        }
-    })
-    .catch(error => {
-        console.error('Error saving social media to API:', error);
-        // Show a notification that it was saved locally only
-        showNotification('Social media links saved locally only. Some server error occurred.');
-    })
-    .finally(() => {
-        // Also save to localStorage as a fallback
-        localStorage.setItem('socialMedia', JSON.stringify(socialMedia));
-    });
-}
-
-// Services Management
-function initializeServicesManagement() {
-    const servicesList = document.querySelector('.services-list');
-    const addServiceBtn = document.getElementById('addServiceBtn');
-    
-    if (servicesList && addServiceBtn) {
-        // Load existing services
-        loadServices();
-        
-        // Add new service
-        addServiceBtn.addEventListener('click', function() {
-            addNewService();
-        });
+    try {
+        await saveWithFallback('/api/settings', 'socialMedia', { socialMedia });
+    } catch (error) {
+        console.error('Failed to save social media links:', error);
+        showNotification('Failed to save social media links', 'error');
+    } finally {
+        setLoadingState(submitBtn, false);
     }
 }
 
-function loadServices() {
-    const servicesList = document.querySelector('.services-list');
-    servicesList.innerHTML = ''; // Clear list
+// Services Management Functions
+function initializeServicesManagement() {
+    const servicesTab = document.getElementById('servicesTab');
+    if (!servicesTab) return;
     
-    // Try to get data from API first
-    fetch('/api/content')
-        .then(response => response.json())
-        .then(data => {
-            if (data.services && Array.isArray(data.services)) {
-                // Create service items
-                data.services.forEach((service, index) => {
-                    const serviceItem = createServiceItem(service, index);
-                    servicesList.appendChild(serviceItem);
-                });
-                
-                // Add event listeners for edit and delete buttons
-                addServiceEventListeners();
-            } else {
-                fallbackToLocalStorage();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading services from API:', error);
-            fallbackToLocalStorage();
-        });
+    // Load saved services
+    loadServices();
     
-    function fallbackToLocalStorage() {
-        // Get services from localStorage or use default ones
-        const services = JSON.parse(localStorage.getItem('services')) || [
-            {
-                icon: 'fas fa-laptop',
-                title: 'Laptop Repair',
-                description: 'Professional laptop repair services with quick turnaround time.'
-            },
-            {
-                icon: 'fas fa-desktop',
-                title: 'Computer Sales',
-                description: 'Wide range of computers and laptops for personal and business use.'
-            },
-            {
-                icon: 'fas fa-microchip',
-                title: 'Parts & Accessories',
-                description: 'Quality computer parts and accessories from trusted brands.'
-            },
-            {
-                icon: 'fas fa-virus-slash',
-                title: 'Virus Removal',
-                description: 'Effective virus and malware removal services for your devices.'
-            },
-            {
-                icon: 'fas fa-network-wired',
-                title: 'Network Setup',
-                description: 'Professional network setup and troubleshooting services.'
-            },
-            {
-                icon: 'fas fa-tools',
-                title: 'Maintenance',
-                description: 'Regular maintenance services to keep your systems running smoothly.'
-            }
-        ];
+    // Add service button event listener
+    const addServiceBtn = document.getElementById('addServiceBtn');
+    if (addServiceBtn) {
+        addServiceBtn.addEventListener('click', addNewService);
+    }
+}
+
+async function loadServices() {
+    const servicesContainer = document.getElementById('servicesContainer');
+    if (!servicesContainer) return;
+    
+    // Show loading indicator
+    servicesContainer.innerHTML = '<div class="loading-spinner"></div>';
+    
+    try {
+        const data = await fetchWithFallback('/api/content', 'services', { services: [] });
+        const services = data.services || [];
         
-        // Save default services if none exist
-        if (!localStorage.getItem('services')) {
-            localStorage.setItem('services', JSON.stringify(services));
+        if (services.length === 0) {
+            servicesContainer.innerHTML = '<p>No services found. Add your first service.</p>';
+            return;
         }
         
-        // Create service items
+        // Display services
+        servicesContainer.innerHTML = '';
         services.forEach((service, index) => {
             const serviceItem = createServiceItem(service, index);
-            servicesList.appendChild(serviceItem);
+            servicesContainer.appendChild(serviceItem);
         });
         
-        // Add event listeners for edit and delete buttons
+        // Add event listeners
         addServiceEventListeners();
+    } catch (error) {
+        console.error('Failed to load services:', error);
+        servicesContainer.innerHTML = '<p>Failed to load services. Please try again.</p>';
+        showNotification('Failed to load services', 'error');
     }
 }
 
 function createServiceItem(service, index) {
-    const serviceItem = document.createElement('div');
-    serviceItem.className = 'service-item';
-    serviceItem.dataset.index = index;
+    const serviceElement = document.createElement('div');
+    serviceElement.className = 'service-item';
+    serviceElement.dataset.index = index;
     
-    serviceItem.innerHTML = `
+    serviceElement.innerHTML = `
         <div class="service-header">
-            <h3>${service.title}</h3>
+            <h3>${service.title || 'Untitled Service'}</h3>
             <div class="service-actions">
-                <button class="btn-icon edit-btn"><i class="fas fa-edit"></i></button>
-                <button class="btn-icon delete-btn"><i class="fas fa-trash"></i></button>
+                <button class="edit-service-btn"><i class="fas fa-edit"></i> Edit</button>
+                <button class="delete-service-btn"><i class="fas fa-trash"></i> Delete</button>
             </div>
         </div>
         <div class="service-details">
+            <p><strong>Icon:</strong> <i class="${service.icon || 'fas fa-question'}"></i> (${service.icon || 'None'})</p>
+            <p><strong>Description:</strong> ${service.description || 'No description'}</p>
+        </div>
+        <div class="service-edit-form" style="display: none;">
             <div class="form-group">
-                <label>Icon</label>
-                <select class="service-icon">
-                    <option value="fas fa-laptop" ${service.icon === 'fas fa-laptop' ? 'selected' : ''}>Laptop</option>
-                    <option value="fas fa-desktop" ${service.icon === 'fas fa-desktop' ? 'selected' : ''}>Desktop</option>
-                    <option value="fas fa-microchip" ${service.icon === 'fas fa-microchip' ? 'selected' : ''}>Microchip</option>
-                    <option value="fas fa-tools" ${service.icon === 'fas fa-tools' ? 'selected' : ''}>Tools</option>
-                    <option value="fas fa-virus-slash" ${service.icon === 'fas fa-virus-slash' ? 'selected' : ''}>Virus</option>
-                    <option value="fas fa-network-wired" ${service.icon === 'fas fa-network-wired' ? 'selected' : ''}>Network</option>
-                </select>
+                <label for="serviceTitle${index}">Title:</label>
+                <input type="text" id="serviceTitle${index}" value="${service.title || ''}" required>
             </div>
             <div class="form-group">
-                <label>Title</label>
-                <input type="text" class="service-title" value="${service.title}">
+                <label for="serviceIcon${index}">Icon (Font Awesome class):</label>
+                <input type="text" id="serviceIcon${index}" value="${service.icon || ''}">
+                <small>E.g., fas fa-laptop, fas fa-desktop, etc.</small>
             </div>
             <div class="form-group">
-                <label>Description</label>
-                <textarea class="service-description">${service.description}</textarea>
+                <label for="serviceDesc${index}">Description:</label>
+                <textarea id="serviceDesc${index}" rows="3" required>${service.description || ''}</textarea>
             </div>
-            <button class="btn btn-primary save-service-btn">Save Changes</button>
+            <div class="form-buttons">
+                <button class="save-service-btn">Save Changes</button>
+                <button class="cancel-service-btn">Cancel</button>
+            </div>
         </div>
     `;
     
-    return serviceItem;
+    return serviceElement;
 }
 
 function addServiceEventListeners() {
-    // Delete buttons
-    document.querySelectorAll('.service-item .delete-btn').forEach(button => {
+    // Edit service buttons
+    document.querySelectorAll('.edit-service-btn').forEach(button => {
         button.addEventListener('click', function() {
-            if (confirm('Are you sure you want to delete this service?')) {
-                const serviceItem = this.closest('.service-item');
-                const index = serviceItem.dataset.index;
+            const serviceItem = this.closest('.service-item');
+            serviceItem.querySelector('.service-details').style.display = 'none';
+            serviceItem.querySelector('.service-edit-form').style.display = 'block';
+            this.style.display = 'none';
+        });
+    });
+    
+    // Cancel edit buttons
+    document.querySelectorAll('.cancel-service-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const serviceItem = this.closest('.service-item');
+            serviceItem.querySelector('.service-details').style.display = 'block';
+            serviceItem.querySelector('.service-edit-form').style.display = 'none';
+            serviceItem.querySelector('.edit-service-btn').style.display = 'inline-block';
+        });
+    });
+    
+    // Save service buttons
+    document.querySelectorAll('.save-service-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const serviceItem = this.closest('.service-item');
+            const index = parseInt(serviceItem.dataset.index);
+            
+            // Show loading state
+            setLoadingState(this, true, 'Saving...');
+            
+            // Get all current services
+            let services = [];
+            try {
+                const data = await fetchWithFallback('/api/content', 'services', { services: [] });
+                services = data.services || [];
+            } catch (error) {
+                console.error('Error fetching services:', error);
+                services = JSON.parse(localStorage.getItem('services')) || [];
+            }
+            
+            // Update the service at this index
+            services[index] = {
+                title: document.getElementById(`serviceTitle${index}`).value,
+                icon: document.getElementById(`serviceIcon${index}`).value,
+                description: document.getElementById(`serviceDesc${index}`).value
+            };
+            
+            try {
+                await saveWithFallback('/api/content', 'services', { services });
                 
-                // Show loading state
-                showNotification('Deleting service...');
+                // Update the UI
+                serviceItem.querySelector('h3').textContent = services[index].title || 'Untitled Service';
+                serviceItem.querySelector('.service-details').innerHTML = `
+                    <p><strong>Icon:</strong> <i class="${services[index].icon || 'fas fa-question'}"></i> (${services[index].icon || 'None'})</p>
+                    <p><strong>Description:</strong> ${services[index].description || 'No description'}</p>
+                `;
                 
-                // Get current services from API first
-                fetch('/api/content')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.services && Array.isArray(data.services)) {
-                            // Remove the service
-                            const services = data.services;
-                            services.splice(index, 1);
-                            
-                            // Save updated services to API
-                            return fetch('/api/content', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({ services })
-                            });
-                        } else {
-                            throw new Error('Could not retrieve services from API');
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                        if (result.success) {
-                            // Also update localStorage as fallback
-                            const localServices = JSON.parse(localStorage.getItem('services')) || [];
-                            localServices.splice(index, 1);
-                            localStorage.setItem('services', JSON.stringify(localServices));
-                            
-                            // Reload services
-                            loadServices();
-                            showNotification('Service deleted successfully');
-                        } else {
-                            throw new Error(result.error || 'Failed to delete service');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error deleting service via API:', error);
-                        
-                        // Fall back to localStorage method
-                        const services = JSON.parse(localStorage.getItem('services')) || [];
-                        services.splice(index, 1);
-                        localStorage.setItem('services', JSON.stringify(services));
-                        
-                        // Reload services
-                        loadServices();
-                        showNotification('Service deleted successfully (local only)');
-                    });
+                // Hide edit form
+                serviceItem.querySelector('.service-details').style.display = 'block';
+                serviceItem.querySelector('.service-edit-form').style.display = 'none';
+                serviceItem.querySelector('.edit-service-btn').style.display = 'inline-block';
+            } catch (error) {
+                console.error('Failed to save service:', error);
+                showNotification('Failed to save service', 'error');
+            } finally {
+                setLoadingState(button, false);
             }
         });
     });
     
-    // Save buttons
-    document.querySelectorAll('.service-item .save-service-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const serviceItem = this.closest('.service-item');
-            const index = serviceItem.dataset.index;
-            
-            // Get form values
-            const icon = serviceItem.querySelector('.service-icon').value;
-            const title = serviceItem.querySelector('.service-title').value;
-            const description = serviceItem.querySelector('.service-description').value;
-            
-            // Validate
-            if (!title || !description) {
-                alert('Please fill in all fields');
+    // Delete service buttons
+    document.querySelectorAll('.delete-service-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            if (!confirm('Are you sure you want to delete this service?')) {
                 return;
             }
             
-            // Show loading state
-            showNotification('Saving service...');
-            
-            // Update service in API
-            fetch('/api/content')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.services && Array.isArray(data.services)) {
-                        // Update the service
-                        const services = data.services;
-                        services[index] = { icon, title, description };
-                        
-                        // Save updated services to API
-                        return fetch('/api/content', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ services })
-                        });
-                    } else {
-                        throw new Error('Could not retrieve services from API');
-                    }
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        // Also update localStorage as fallback
-                        const localServices = JSON.parse(localStorage.getItem('services')) || [];
-                        localServices[index] = { icon, title, description };
-                        localStorage.setItem('services', JSON.stringify(localServices));
-                        
-                        // Hide details
-                        serviceItem.querySelector('.service-details').style.display = 'none';
-                        
-                        // Update header title
-                        serviceItem.querySelector('.service-header h3').textContent = title;
-                        
-                        showNotification('Service updated successfully');
-                    } else {
-                        throw new Error(result.error || 'Failed to update service');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error updating service via API:', error);
-                    
-                    // Fall back to localStorage method
-                    const services = JSON.parse(localStorage.getItem('services')) || [];
-                    services[index] = { icon, title, description };
-                    localStorage.setItem('services', JSON.stringify(services));
-                    
-                    // Hide details
-                    serviceItem.querySelector('.service-details').style.display = 'none';
-                    
-                    // Update header title
-                    serviceItem.querySelector('.service-header h3').textContent = title;
-                    
-                    showNotification('Service updated successfully (local only)');
-                });
-        });
-    });
-    
-    // Edit buttons
-    document.querySelectorAll('.service-item .edit-btn').forEach(button => {
-        button.addEventListener('click', function() {
             const serviceItem = this.closest('.service-item');
-            const details = serviceItem.querySelector('.service-details');
+            const index = parseInt(serviceItem.dataset.index);
             
-            if (details.style.display === 'block') {
-                details.style.display = 'none';
-            } else {
-                document.querySelectorAll('.service-details').forEach(d => d.style.display = 'none');
-                details.style.display = 'block';
+            // Show loading state
+            setLoadingState(this, true, 'Deleting...');
+            
+            // Get all current services
+            let services = [];
+            try {
+                const data = await fetchWithFallback('/api/content', 'services', { services: [] });
+                services = data.services || [];
+            } catch (error) {
+                console.error('Error fetching services:', error);
+                services = JSON.parse(localStorage.getItem('services')) || [];
+            }
+            
+            // Remove the service at this index
+            services.splice(index, 1);
+            
+            try {
+                await saveWithFallback('/api/content', 'services', { services });
+                
+                // Reload services to update indexes
+                loadServices();
+            } catch (error) {
+                console.error('Failed to delete service:', error);
+                showNotification('Failed to delete service', 'error');
+                setLoadingState(button, false);
             }
         });
     });
 }
 
-function addNewService() {
-    // Show loading state
-    showNotification('Adding new service...');
+async function addNewService() {
+    const newServiceModal = document.getElementById('newServiceModal');
+    const newServiceForm = document.getElementById('newServiceForm');
     
-    // Get services from API first
-    fetch('/api/content')
-        .then(response => response.json())
-        .then(data => {
-            const services = data.services && Array.isArray(data.services) 
-                ? data.services 
-                : JSON.parse(localStorage.getItem('services')) || [];
+    if (!newServiceModal || !newServiceForm) return;
+    
+    // Show modal
+    newServiceModal.style.display = 'block';
+    
+    // Clear form
+    newServiceForm.reset();
+    
+    // Form submit handler
+    const handleSubmit = async function(e) {
+        e.preventDefault();
+        
+        const submitBtn = newServiceForm.querySelector('button[type="submit"]');
+        setLoadingState(submitBtn, true, 'Adding Service...');
+        
+        const newService = {
+            title: document.getElementById('newServiceTitle').value,
+            icon: document.getElementById('newServiceIcon').value,
+            description: document.getElementById('newServiceDesc').value
+        };
+        
+        // Get all current services
+        let services = [];
+        try {
+            const data = await fetchWithFallback('/api/content', 'services', { services: [] });
+            services = data.services || [];
+        } catch (error) {
+            console.error('Error fetching services:', error);
+            services = JSON.parse(localStorage.getItem('services')) || [];
+        }
+        
+        // Add the new service
+        services.push(newService);
+        
+        try {
+            await saveWithFallback('/api/content', 'services', { services });
             
-            // Add new empty service
-            services.push({
-                icon: 'fas fa-laptop',
-                title: 'New Service',
-                description: 'Service description here.'
-            });
-            
-            // Save updated services to API
-            return fetch('/api/content', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ services })
-            });
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                // Also save to localStorage as a fallback
-                const localServices = JSON.parse(localStorage.getItem('services')) || [];
-                localServices.push({
-                    icon: 'fas fa-laptop',
-                    title: 'New Service',
-                    description: 'Service description here.'
-                });
-                localStorage.setItem('services', JSON.stringify(localServices));
-                
-                // Reload services
-                loadServices();
-                
-                // Show edit form for the new service
-                setTimeout(() => {
-                    const serviceItems = document.querySelectorAll('.service-item');
-                    const newServiceItem = serviceItems[serviceItems.length - 1];
-                    newServiceItem.querySelector('.service-details').style.display = 'block';
-                }, 100);
-                
-                showNotification('New service added');
-            } else {
-                throw new Error(result.error || 'Failed to add service');
-            }
-        })
-        .catch(error => {
-            console.error('Error adding service via API:', error);
-            
-            // Fall back to localStorage method
-            const services = JSON.parse(localStorage.getItem('services')) || [];
-            
-            // Add new empty service
-            services.push({
-                icon: 'fas fa-laptop',
-                title: 'New Service',
-                description: 'Service description here.'
-            });
-            
-            // Save updated services
-            localStorage.setItem('services', JSON.stringify(services));
-            
-            // Reload services
+            // Hide modal and reload services
+            newServiceModal.style.display = 'none';
             loadServices();
-            
-            // Show edit form for the new service
-            setTimeout(() => {
-                const serviceItems = document.querySelectorAll('.service-item');
-                const newServiceItem = serviceItems[serviceItems.length - 1];
-                newServiceItem.querySelector('.service-details').style.display = 'block';
-            }, 100);
-            
-            showNotification('New service added (local only)');
+        } catch (error) {
+            console.error('Failed to add new service:', error);
+            showNotification('Failed to add new service', 'error');
+        } finally {
+            setLoadingState(submitBtn, false);
+        }
+        
+        // Remove event listener to prevent multiple submissions
+        newServiceForm.removeEventListener('submit', handleSubmit);
+    };
+    
+    // Add submit event listener
+    newServiceForm.addEventListener('submit', handleSubmit);
+    
+    // Close modal button
+    const closeBtn = newServiceModal.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            newServiceModal.style.display = 'none';
+            // Remove event listener when closing
+            newServiceForm.removeEventListener('submit', handleSubmit);
         });
+    }
+    
+    // Close when clicking outside the modal
+    window.addEventListener('click', function(event) {
+        if (event.target === newServiceModal) {
+            newServiceModal.style.display = 'none';
+            // Remove event listener when closing
+            newServiceForm.removeEventListener('submit', handleSubmit);
+        }
+    });
 }
 
-// Products Management
+// Products Management Functions
 function initializeProductsManagement() {
-    const productsList = document.querySelector('.products-list');
-    const addProductBtn = document.getElementById('addProductBtn');
+    const productsTab = document.getElementById('productsTab');
+    if (!productsTab) return;
     
-    if (productsList && addProductBtn) {
-        // Load existing products
-        loadProducts();
-        
-        // Add new product
-        addProductBtn.addEventListener('click', function() {
-            addNewProduct();
-        });
+    // Load saved products
+    loadProducts();
+    
+    // Add product button event listener
+    const addProductBtn = document.getElementById('addProductBtn');
+    if (addProductBtn) {
+        addProductBtn.addEventListener('click', addNewProduct);
     }
 }
 
-function loadProducts() {
-    const productsList = document.querySelector('.products-list');
-    productsList.innerHTML = ''; // Clear list
+async function loadProducts() {
+    const productsContainer = document.getElementById('productsContainer');
+    if (!productsContainer) return;
     
-    // Try to get data from API first
-    fetch('/api/content')
-        .then(response => response.json())
-        .then(data => {
-            if (data.products && Array.isArray(data.products)) {
-                // Create product items
-                data.products.forEach((product, index) => {
-                    const productItem = createProductItem(product, index);
-                    productsList.appendChild(productItem);
-                });
-                
-                // Add event listeners for edit and delete buttons
-                addProductEventListeners();
-            } else {
-                fallbackToLocalStorage();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading products from API:', error);
-            fallbackToLocalStorage();
-        });
+    // Show loading indicator
+    productsContainer.innerHTML = '<div class="loading-spinner"></div>';
     
-    function fallbackToLocalStorage() {
-        // Get products from localStorage or use default ones
-        const products = JSON.parse(localStorage.getItem('products')) || [
-            {
-                image: 'images/laptop1.jpg',
-                title: 'Premium Laptops',
-                description: 'High-performance laptops for professionals and gamers'
-            },
-            {
-                image: 'images/desktop1.jpg',
-                title: 'Desktop Systems',
-                description: 'Powerful desktop computers for every need'
-            },
-            {
-                image: 'images/parts1.jpg',
-                title: 'Computer Parts',
-                description: 'Quality components for upgrades and repairs'
-            },
-            {
-                image: 'images/accessories1.jpg',
-                title: 'Accessories',
-                description: 'Wide range of accessories to enhance your computing experience'
-            }
-        ];
+    try {
+        const data = await fetchWithFallback('/api/content', 'products', { products: [] });
+        const products = data.products || [];
         
-        // Save default products if none exist
-        if (!localStorage.getItem('products')) {
-            localStorage.setItem('products', JSON.stringify(products));
+        if (products.length === 0) {
+            productsContainer.innerHTML = '<p>No products found. Add your first product.</p>';
+            return;
         }
         
-        // Create product items
+        // Display products
+        productsContainer.innerHTML = '';
         products.forEach((product, index) => {
             const productItem = createProductItem(product, index);
-            productsList.appendChild(productItem);
+            productsContainer.appendChild(productItem);
         });
         
-        // Add event listeners for edit and delete buttons
+        // Add event listeners
         addProductEventListeners();
+    } catch (error) {
+        console.error('Failed to load products:', error);
+        productsContainer.innerHTML = '<p>Failed to load products. Please try again.</p>';
+        showNotification('Failed to load products', 'error');
     }
 }
 
 function createProductItem(product, index) {
-    const productItem = document.createElement('div');
-    productItem.className = 'product-item';
-    productItem.dataset.index = index;
+    const productElement = document.createElement('div');
+    productElement.className = 'product-item';
+    productElement.dataset.index = index;
     
-    productItem.innerHTML = `
+    productElement.innerHTML = `
         <div class="product-header">
-            <h3>${product.title}</h3>
+            <h3>${product.title || 'Untitled Product'}</h3>
             <div class="product-actions">
-                <button class="btn-icon edit-btn"><i class="fas fa-edit"></i></button>
-                <button class="btn-icon delete-btn"><i class="fas fa-trash"></i></button>
+                <button class="edit-product-btn"><i class="fas fa-edit"></i> Edit</button>
+                <button class="delete-product-btn"><i class="fas fa-trash"></i> Delete</button>
             </div>
         </div>
         <div class="product-details">
+            <div class="product-image">
+                <img src="${product.image || 'images/placeholder.jpg'}" alt="${product.title || 'Product'}">
+            </div>
+            <p><strong>Description:</strong> ${product.description || 'No description'}</p>
+        </div>
+        <div class="product-edit-form" style="display: none;">
             <div class="form-group">
-                <label>Image</label>
-                <div class="product-image-preview">
-                    <img src="${product.image}" alt="Product Image">
-                    <input type="file" class="product-image-upload" accept="image/*">
-                </div>
+                <label for="productTitle${index}">Title:</label>
+                <input type="text" id="productTitle${index}" value="${product.title || ''}" required>
             </div>
             <div class="form-group">
-                <label>Title</label>
-                <input type="text" class="product-title" value="${product.title}">
+                <label for="productImage${index}">Image URL:</label>
+                <input type="text" id="productImage${index}" value="${product.image || ''}">
+                <small>Path to image file (e.g., images/product.jpg)</small>
             </div>
             <div class="form-group">
-                <label>Description</label>
-                <textarea class="product-description">${product.description}</textarea>
+                <label for="productDesc${index}">Description:</label>
+                <textarea id="productDesc${index}" rows="3" required>${product.description || ''}</textarea>
             </div>
-            <button class="btn btn-primary save-product-btn">Save Changes</button>
+            <div class="form-buttons">
+                <button class="save-product-btn">Save Changes</button>
+                <button class="cancel-product-btn">Cancel</button>
+            </div>
         </div>
     `;
     
-    return productItem;
+    return productElement;
 }
 
 function addProductEventListeners() {
-    // Delete buttons
-    document.querySelectorAll('.product-item .delete-btn').forEach(button => {
+    // Edit product buttons
+    document.querySelectorAll('.edit-product-btn').forEach(button => {
         button.addEventListener('click', function() {
-            if (confirm('Are you sure you want to delete this product?')) {
-                const productItem = this.closest('.product-item');
-                const index = productItem.dataset.index;
+            const productItem = this.closest('.product-item');
+            productItem.querySelector('.product-details').style.display = 'none';
+            productItem.querySelector('.product-edit-form').style.display = 'block';
+            this.style.display = 'none';
+        });
+    });
+    
+    // Cancel edit buttons
+    document.querySelectorAll('.cancel-product-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const productItem = this.closest('.product-item');
+            productItem.querySelector('.product-details').style.display = 'block';
+            productItem.querySelector('.product-edit-form').style.display = 'none';
+            productItem.querySelector('.edit-product-btn').style.display = 'inline-block';
+        });
+    });
+    
+    // Save product buttons
+    document.querySelectorAll('.save-product-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const productItem = this.closest('.product-item');
+            const index = parseInt(productItem.dataset.index);
+            
+            // Show loading state
+            setLoadingState(this, true, 'Saving...');
+            
+            // Get all current products
+            let products = [];
+            try {
+                const data = await fetchWithFallback('/api/content', 'products', { products: [] });
+                products = data.products || [];
+            } catch (error) {
+                console.error('Error fetching products:', error);
+                products = JSON.parse(localStorage.getItem('products')) || [];
+            }
+            
+            // Update the product at this index
+            products[index] = {
+                title: document.getElementById(`productTitle${index}`).value,
+                image: document.getElementById(`productImage${index}`).value,
+                description: document.getElementById(`productDesc${index}`).value
+            };
+            
+            try {
+                await saveWithFallback('/api/content', 'products', { products });
                 
-                // Show loading state
-                showNotification('Deleting product...');
+                // Update the UI
+                productItem.querySelector('h3').textContent = products[index].title || 'Untitled Product';
+                productItem.querySelector('.product-details').innerHTML = `
+                    <div class="product-image">
+                        <img src="${products[index].image || 'images/placeholder.jpg'}" alt="${products[index].title || 'Product'}">
+                    </div>
+                    <p><strong>Description:</strong> ${products[index].description || 'No description'}</p>
+                `;
                 
-                // Get current products from API first
-                fetch('/api/content')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.products && Array.isArray(data.products)) {
-                            // Remove the product
-                            const products = data.products;
-                            products.splice(index, 1);
-                            
-                            // Save updated products to API
-                            return fetch('/api/content', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({ products })
-                            });
-                        } else {
-                            throw new Error('Could not retrieve products from API');
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                        if (result.success) {
-                            // Also update localStorage as fallback
-                            const localProducts = JSON.parse(localStorage.getItem('products')) || [];
-                            localProducts.splice(index, 1);
-                            localStorage.setItem('products', JSON.stringify(localProducts));
-                            
-                            // Reload products
-                            loadProducts();
-                            showNotification('Product deleted successfully');
-                        } else {
-                            throw new Error(result.error || 'Failed to delete product');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error deleting product via API:', error);
-                        
-                        // Fall back to localStorage method
-                        const products = JSON.parse(localStorage.getItem('products')) || [];
-                        products.splice(index, 1);
-                        localStorage.setItem('products', JSON.stringify(products));
-                        
-                        // Reload products
-                        loadProducts();
-                        showNotification('Product deleted successfully (local only)');
-                    });
+                // Hide edit form
+                productItem.querySelector('.product-details').style.display = 'block';
+                productItem.querySelector('.product-edit-form').style.display = 'none';
+                productItem.querySelector('.edit-product-btn').style.display = 'inline-block';
+            } catch (error) {
+                console.error('Failed to save product:', error);
+                showNotification('Failed to save product', 'error');
+            } finally {
+                setLoadingState(button, false);
             }
         });
     });
     
-    // Save buttons
-    document.querySelectorAll('.product-item .save-product-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const productItem = this.closest('.product-item');
-            const index = productItem.dataset.index;
-            
-            // Get form values
-            const title = productItem.querySelector('.product-title').value;
-            const description = productItem.querySelector('.product-description').value;
-            
-            // Get current image from img src
-            const currentImage = productItem.querySelector('.product-image-preview img').src;
-            
-            // Check if a new image was uploaded
-            const imageFile = productItem.querySelector('.product-image-upload').files[0];
-            
-            // Validate
-            if (!title || !description) {
-                alert('Please fill in all fields');
+    // Delete product buttons
+    document.querySelectorAll('.delete-product-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            if (!confirm('Are you sure you want to delete this product?')) {
                 return;
             }
             
-            // Show loading state
-            showNotification('Saving product...');
-            
-            // If there's a new image, handle it
-            if (imageFile) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    // Get the image data URL
-                    const imageData = e.target.result;
-                    
-                    // Update product with new image in API
-                    updateProductInAPI({ 
-                        image: imageData,
-                        title: title,
-                        description: description
-                    }, index);
-                };
-                reader.readAsDataURL(imageFile);
-            } else {
-                // Update product with existing image in API
-                updateProductInAPI({ 
-                    image: currentImage,
-                    title: title,
-                    description: description
-                }, index);
-            }
-        });
-    });
-    
-    // Helper function to update a product in the API
-    function updateProductInAPI(productData, index) {
-        fetch('/api/content')
-            .then(response => response.json())
-            .then(data => {
-                if (data.products && Array.isArray(data.products)) {
-                    // Update the product
-                    const products = data.products;
-                    products[index] = productData;
-                    
-                    // Save updated products to API
-                    return fetch('/api/content', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ products })
-                    });
-                } else {
-                    throw new Error('Could not retrieve products from API');
-                }
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    // Also update localStorage as fallback
-                    const localProducts = JSON.parse(localStorage.getItem('products')) || [];
-                    localProducts[index] = productData;
-                    localStorage.setItem('products', JSON.stringify(localProducts));
-                    
-                    // Find the product item that was being edited
-                    const productItems = document.querySelectorAll('.product-item');
-                    const productItem = productItems[index];
-                    
-                    // Hide details
-                    productItem.querySelector('.product-details').style.display = 'none';
-                    
-                    // Update header title
-                    productItem.querySelector('.product-header h3').textContent = productData.title;
-                    
-                    // Update image preview if it was updated
-                    productItem.querySelector('.product-image-preview img').src = productData.image;
-                    
-                    showNotification('Product updated successfully');
-                } else {
-                    throw new Error(result.error || 'Failed to update product');
-                }
-            })
-            .catch(error => {
-                console.error('Error updating product via API:', error);
-                
-                // Fall back to localStorage method
-                const products = JSON.parse(localStorage.getItem('products')) || [];
-                products[index] = productData;
-                localStorage.setItem('products', JSON.stringify(products));
-                
-                // Find the product item that was being edited
-                const productItems = document.querySelectorAll('.product-item');
-                const productItem = productItems[index];
-                
-                // Hide details
-                productItem.querySelector('.product-details').style.display = 'none';
-                
-                // Update header title
-                productItem.querySelector('.product-header h3').textContent = productData.title;
-                
-                // Update image preview if it was updated
-                productItem.querySelector('.product-image-preview img').src = productData.image;
-                
-                showNotification('Product updated successfully (local only)');
-            });
-    }
-    
-    // Edit buttons
-    document.querySelectorAll('.product-item .edit-btn').forEach(button => {
-        button.addEventListener('click', function() {
             const productItem = this.closest('.product-item');
-            const details = productItem.querySelector('.product-details');
+            const index = parseInt(productItem.dataset.index);
             
-            if (details.style.display === 'block') {
-                details.style.display = 'none';
-            } else {
-                document.querySelectorAll('.product-details').forEach(d => d.style.display = 'none');
-                details.style.display = 'block';
+            // Show loading state
+            setLoadingState(this, true, 'Deleting...');
+            
+            // Get all current products
+            let products = [];
+            try {
+                const data = await fetchWithFallback('/api/content', 'products', { products: [] });
+                products = data.products || [];
+            } catch (error) {
+                console.error('Error fetching products:', error);
+                products = JSON.parse(localStorage.getItem('products')) || [];
             }
-        });
-    });
-    
-    // Image upload preview
-    document.querySelectorAll('.product-image-upload').forEach(input => {
-        input.addEventListener('change', function() {
-            const file = this.files[0];
-            if (file) {
-                const reader = new FileReader();
-                const img = this.closest('.product-image-preview').querySelector('img');
+            
+            // Remove the product at this index
+            products.splice(index, 1);
+            
+            try {
+                await saveWithFallback('/api/content', 'products', { products });
                 
-                reader.onload = function(e) {
-                    img.src = e.target.result;
-                };
-                
-                reader.readAsDataURL(file);
+                // Reload products to update indexes
+                loadProducts();
+            } catch (error) {
+                console.error('Failed to delete product:', error);
+                showNotification('Failed to delete product', 'error');
+                setLoadingState(button, false);
             }
         });
     });
 }
 
-function addNewProduct() {
-    // Show loading state
-    showNotification('Adding new product...');
+async function addNewProduct() {
+    const newProductModal = document.getElementById('newProductModal');
+    const newProductForm = document.getElementById('newProductForm');
     
-    // Get products from API first
-    fetch('/api/content')
-        .then(response => response.json())
-        .then(data => {
-            const products = data.products && Array.isArray(data.products) 
-                ? data.products 
-                : JSON.parse(localStorage.getItem('products')) || [];
+    if (!newProductModal || !newProductForm) return;
+    
+    // Show modal
+    newProductModal.style.display = 'block';
+    
+    // Clear form
+    newProductForm.reset();
+    
+    // Form submit handler
+    const handleSubmit = async function(e) {
+        e.preventDefault();
+        
+        const submitBtn = newProductForm.querySelector('button[type="submit"]');
+        setLoadingState(submitBtn, true, 'Adding Product...');
+        
+        const newProduct = {
+            title: document.getElementById('newProductTitle').value,
+            image: document.getElementById('newProductImage').value,
+            description: document.getElementById('newProductDesc').value
+        };
+        
+        // Get all current products
+        let products = [];
+        try {
+            const data = await fetchWithFallback('/api/content', 'products', { products: [] });
+            products = data.products || [];
+        } catch (error) {
+            console.error('Error fetching products:', error);
+            products = JSON.parse(localStorage.getItem('products')) || [];
+        }
+        
+        // Add the new product
+        products.push(newProduct);
+        
+        try {
+            await saveWithFallback('/api/content', 'products', { products });
             
-            // Add new empty product
-            products.push({
-                image: 'images/placeholder.jpg',
-                title: 'New Product',
-                description: 'Product description here.'
-            });
-            
-            // Save updated products to API
-            return fetch('/api/content', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ products })
-            });
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                // Also save to localStorage as a fallback
-                const localProducts = JSON.parse(localStorage.getItem('products')) || [];
-                localProducts.push({
-                    image: 'images/placeholder.jpg',
-                    title: 'New Product',
-                    description: 'Product description here.'
-                });
-                localStorage.setItem('products', JSON.stringify(localProducts));
-                
-                // Reload products
-                loadProducts();
-                
-                // Show edit form for the new product
-                setTimeout(() => {
-                    const productItems = document.querySelectorAll('.product-item');
-                    const newProductItem = productItems[productItems.length - 1];
-                    newProductItem.querySelector('.product-details').style.display = 'block';
-                }, 100);
-                
-                showNotification('New product added');
-            } else {
-                throw new Error(result.error || 'Failed to add product');
-            }
-        })
-        .catch(error => {
-            console.error('Error adding product via API:', error);
-            
-            // Fall back to localStorage method
-            const products = JSON.parse(localStorage.getItem('products')) || [];
-            
-            // Add new empty product
-            products.push({
-                image: 'images/placeholder.jpg',
-                title: 'New Product',
-                description: 'Product description here.'
-            });
-            
-            // Save updated products
-            localStorage.setItem('products', JSON.stringify(products));
-            
-            // Reload products
+            // Hide modal and reload products
+            newProductModal.style.display = 'none';
             loadProducts();
-            
-            // Show edit form for the new product
-            setTimeout(() => {
-                const productItems = document.querySelectorAll('.product-item');
-                const newProductItem = productItems[productItems.length - 1];
-                newProductItem.querySelector('.product-details').style.display = 'block';
-            }, 100);
-            
-            showNotification('New product added (local only)');
+        } catch (error) {
+            console.error('Failed to add new product:', error);
+            showNotification('Failed to add new product', 'error');
+        } finally {
+            setLoadingState(submitBtn, false);
+        }
+        
+        // Remove event listener to prevent multiple submissions
+        newProductForm.removeEventListener('submit', handleSubmit);
+    };
+    
+    // Add submit event listener
+    newProductForm.addEventListener('submit', handleSubmit);
+    
+    // Close modal button
+    const closeBtn = newProductModal.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            newProductModal.style.display = 'none';
+            // Remove event listener when closing
+            newProductForm.removeEventListener('submit', handleSubmit);
         });
+    }
+    
+    // Close when clicking outside the modal
+    window.addEventListener('click', function(event) {
+        if (event.target === newProductModal) {
+            newProductModal.style.display = 'none';
+            // Remove event listener when closing
+            newProductForm.removeEventListener('submit', handleSubmit);
+        }
+    });
 }
 
 // Google Maps Settings
 function initializeMapSettings() {
-    const mapSettingsForm = document.getElementById('mapSettingsForm');
-    const mapPreviewContainer = document.getElementById('mapPreviewContainer');
+    const mapSettingsTab = document.getElementById('mapTab');
+    if (!mapSettingsTab) return;
     
-    if (mapSettingsForm && mapPreviewContainer) {
-        // Load saved map settings
-        loadMapSettings();
-        
-        // Save map settings on form submit
+    // Load map settings
+    loadMapSettings();
+    
+    // Update preview when iframe code changes
+    const iframeCodeInput = document.getElementById('mapIframe');
+    if (iframeCodeInput) {
+        iframeCodeInput.addEventListener('input', updateMapPreview);
+    }
+    
+    // Save map settings
+    const mapSettingsForm = document.getElementById('mapSettingsForm');
+    if (mapSettingsForm) {
         mapSettingsForm.addEventListener('submit', function(e) {
             e.preventDefault();
             saveMapSettings();
         });
-        
-        // Update preview on input change
-        document.getElementById('mapIframeCode').addEventListener('input', updateMapPreview);
-        
-        // Initial preview
-        updateMapPreview();
     }
 }
 
-function loadMapSettings() {
-    // Try to get data from API first
-    fetch('/api/map')
-        .then(response => response.json())
-        .then(mapSettings => {
-            // Update form fields
-            document.getElementById('mapIframeCode').value = mapSettings.iframeCode || '';
-            document.getElementById('mapDirectionsUrl').value = mapSettings.directionsUrl || '';
-            
-            // Update map preview with the settings
-            updateMapPreview();
-        })
-        .catch(error => {
-            console.error('Error loading map settings from API:', error);
-            
-            // Fall back to localStorage if API fails
-            fallbackToLocalStorage();
+async function loadMapSettings() {
+    try {
+        const data = await fetchWithFallback('/api/map', 'mapSettings', { 
+            iframeCode: '',
+            directionsUrl: '',
+            height: '220'
         });
-    
-    function fallbackToLocalStorage() {
-        const mapSettings = JSON.parse(localStorage.getItem('mapSettings')) || {
-            iframeCode: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.5!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzPCsDUwJzE0LjQiTiA4NMKwMjknMjMuMiJX!5e0!3m2!1sen!2sus!4v1623308321015!5m2!1sen!2sus',
-            directionsUrl: 'https://goo.gl/maps/3uveM77SnX4DXZNK9',
-            height: 250
-        };
         
-        document.getElementById('mapIframeCode').value = mapSettings.iframeCode || '';
-        document.getElementById('mapDirectionsUrl').value = mapSettings.directionsUrl || '';
+        document.getElementById('mapIframe').value = data.iframeCode || '';
+        document.getElementById('mapDirectionsUrl').value = data.directionsUrl || '';
+        document.getElementById('mapHeight').value = data.height || '220';
         
-        // Update map preview with the settings
+        // Update the preview
         updateMapPreview();
+    } catch (error) {
+        console.error('Failed to load map settings:', error);
+        showNotification('Failed to load map settings', 'error');
     }
 }
 
-function saveMapSettings() {
-    // Get values from form
+async function saveMapSettings() {
+    const submitBtn = document.querySelector('#mapSettingsForm button[type="submit"]');
+    setLoadingState(submitBtn, true, 'Saving...');
+    
     const mapSettings = {
-        iframeCode: document.getElementById('mapIframeCode').value,
-        directionsUrl: document.getElementById('mapDirectionsUrl').value
+        iframeCode: document.getElementById('mapIframe').value,
+        directionsUrl: document.getElementById('mapDirectionsUrl').value,
+        height: document.getElementById('mapHeight').value
     };
     
-    // Show loading state
-    showNotification('Saving map settings...');
-    
-    // Save to API first
-    fetch('/api/map', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(mapSettings)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            // Also save to localStorage as a fallback
-            localStorage.setItem('mapSettings', JSON.stringify(mapSettings));
-            
-            // Update map preview
-            updateMapPreview();
-            
-            showNotification('Map settings saved successfully');
-        } else {
-            throw new Error(result.error || 'Failed to save map settings');
-        }
-    })
-    .catch(error => {
-        console.error('Error saving map settings to API:', error);
-        
-        // Fall back to localStorage method
-        localStorage.setItem('mapSettings', JSON.stringify(mapSettings));
-        
-        // Update map preview
+    try {
+        await saveWithFallback('/api/map', 'mapSettings', mapSettings);
+        // Update the preview after saving
         updateMapPreview();
-        
-        showNotification('Map settings saved locally only. Some server error occurred.');
-    });
+    } catch (error) {
+        console.error('Failed to save map settings:', error);
+        showNotification('Failed to save map settings', 'error');
+    } finally {
+        setLoadingState(submitBtn, false);
+    }
 }
 
 function updateMapPreview() {
-    const mapPreviewContainer = document.getElementById('mapPreviewContainer');
-    const iframeCode = document.getElementById('mapIframeCode').value;
+    const previewContainer = document.getElementById('mapPreview');
+    if (!previewContainer) return;
     
-    if (iframeCode) {
-        mapPreviewContainer.innerHTML = iframeCode;
+    const iframeCode = document.getElementById('mapIframe').value;
+    
+    if (iframeCode.trim()) {
+        previewContainer.innerHTML = iframeCode;
     } else {
-        mapPreviewContainer.innerHTML = `<p>Enter a Google Maps Embed URL to see the preview.</p>`;
+        previewContainer.innerHTML = '<div class="placeholder">Map preview will appear here</div>';
     }
 }
 
@@ -1203,16 +949,14 @@ function showNotification(message) {
 
 // Function to update admin password
 function updateAdminPassword(oldPassword, newPassword) {
-    // Get stored password or use default
-    const storedPassword = localStorage.getItem('adminPassword') || 'admin@123';
+    // This is only used as a fallback when the API is not available
+    const savedPassword = localStorage.getItem('adminPassword') || 'admin@123';
     
-    if (oldPassword === storedPassword) {
+    if (oldPassword === savedPassword) {
         localStorage.setItem('adminPassword', newPassword);
-        
-        // Sync with server
-        syncWithServer('password', { password: newPassword });
         return true;
     }
+    
     return false;
 }
 
