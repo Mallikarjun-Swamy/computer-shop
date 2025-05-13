@@ -312,44 +312,44 @@ function loadBusinessInfoFromLocalStorage() {
     
     // Helper function to update UI with business info
     function updateBusinessInfo(businessInfo) {
-        // Update contact information in the page
+    // Update contact information in the page
         addressElement.textContent = businessInfo.address || '123 Tech Street, Digital City, 12345';
         phoneElement.textContent = businessInfo.phone || '+1 (555) 123-4567';
         emailElement.textContent = businessInfo.email || 'info@mahatmaenterprise.com';
-        
-        // Update business hours
+    
+    // Update business hours
         const hoursLines = (businessInfo.hours || 'Monday - Friday: 9am - 6pm\nSaturday: 10am - 4pm\nSunday: Closed').split('\n');
-        if (hoursLines.length > 0) {
-            // If we have more lines than paragraph elements, create additional ones
-            if (hoursLines.length > hoursElements.length) {
-                const hoursContainer = hoursElements[0].parentNode;
-                
-                // Add additional paragraph elements for each line
-                for (let i = hoursElements.length; i < hoursLines.length; i++) {
-                    const newP = document.createElement('p');
-                    hoursContainer.appendChild(newP);
-                }
-                
-                // Get the updated collection of paragraph elements
-                const updatedHoursElements = hoursContainer.querySelectorAll('p');
-                
-                // Update content for each paragraph
-                hoursLines.forEach((line, index) => {
-                    if (updatedHoursElements[index]) {
-                        updatedHoursElements[index].textContent = line;
-                    }
-                });
-            } else {
-                // We have enough or exactly the right number of paragraph elements
-                hoursLines.forEach((line, index) => {
-                    if (hoursElements[index]) {
-                        hoursElements[index].textContent = line;
-                    }
-                });
+    if (hoursLines.length > 0) {
+        // If we have more lines than paragraph elements, create additional ones
+        if (hoursLines.length > hoursElements.length) {
+            const hoursContainer = hoursElements[0].parentNode;
+            
+            // Add additional paragraph elements for each line
+            for (let i = hoursElements.length; i < hoursLines.length; i++) {
+                const newP = document.createElement('p');
+                hoursContainer.appendChild(newP);
             }
+            
+            // Get the updated collection of paragraph elements
+            const updatedHoursElements = hoursContainer.querySelectorAll('p');
+            
+            // Update content for each paragraph
+            hoursLines.forEach((line, index) => {
+                if (updatedHoursElements[index]) {
+                    updatedHoursElements[index].textContent = line;
+                }
+            });
+        } else {
+            // We have enough or exactly the right number of paragraph elements
+            hoursLines.forEach((line, index) => {
+                if (hoursElements[index]) {
+                    hoursElements[index].textContent = line;
+                }
+            });
         }
-        
-        // Update page title if necessary
+    }
+    
+    // Update page title if necessary
         document.title = `${businessInfo.name || 'Mahatma Enterprise'} - Computer & Laptop Sales and Service`;
     }
     
@@ -402,14 +402,14 @@ function loadSocialMediaLinksFromLocalStorage() {
     
     // Fallback function to use localStorage if API fails
     function fallbackToLocalStorage() {
-        // Get social media links from localStorage or use defaults
-        const socialMedia = JSON.parse(localStorage.getItem('socialMedia')) || {
-            facebook: 'https://facebook.com/',
-            twitter: 'https://twitter.com/',
-            instagram: 'https://instagram.com/',
-            linkedin: 'https://linkedin.com/'
-        };
-        
+    // Get social media links from localStorage or use defaults
+    const socialMedia = JSON.parse(localStorage.getItem('socialMedia')) || {
+        facebook: 'https://facebook.com/',
+        twitter: 'https://twitter.com/',
+        instagram: 'https://instagram.com/',
+        linkedin: 'https://linkedin.com/'
+    };
+    
         updateSocialMediaLinks(socialMedia);
     }
 }
@@ -458,40 +458,40 @@ function loadServicesFromLocalStorage() {
     
     // Fallback function to use localStorage if API fails
     function fallbackToLocalStorage() {
-        // Get services from localStorage or use default ones
-        const services = JSON.parse(localStorage.getItem('services')) || [
-            {
-                icon: 'fas fa-laptop',
-                title: 'Laptop Repair',
-                description: 'Professional laptop repair services with quick turnaround time.'
-            },
-            {
-                icon: 'fas fa-desktop',
-                title: 'Computer Sales',
-                description: 'Wide range of computers and laptops for personal and business use.'
-            },
-            {
-                icon: 'fas fa-microchip',
-                title: 'Parts & Accessories',
-                description: 'Quality computer parts and accessories from trusted brands.'
-            },
-            {
-                icon: 'fas fa-virus-slash',
-                title: 'Virus Removal',
-                description: 'Effective virus and malware removal services for your devices.'
-            },
-            {
-                icon: 'fas fa-network-wired',
-                title: 'Network Setup',
-                description: 'Professional network setup and troubleshooting services.'
-            },
-            {
-                icon: 'fas fa-tools',
-                title: 'Maintenance',
-                description: 'Regular maintenance services to keep your systems running smoothly.'
-            }
-        ];
-        
+    // Get services from localStorage or use default ones
+    const services = JSON.parse(localStorage.getItem('services')) || [
+        {
+            icon: 'fas fa-laptop',
+            title: 'Laptop Repair',
+            description: 'Professional laptop repair services with quick turnaround time.'
+        },
+        {
+            icon: 'fas fa-desktop',
+            title: 'Computer Sales',
+            description: 'Wide range of computers and laptops for personal and business use.'
+        },
+        {
+            icon: 'fas fa-microchip',
+            title: 'Parts & Accessories',
+            description: 'Quality computer parts and accessories from trusted brands.'
+        },
+        {
+            icon: 'fas fa-virus-slash',
+            title: 'Virus Removal',
+            description: 'Effective virus and malware removal services for your devices.'
+        },
+        {
+            icon: 'fas fa-network-wired',
+            title: 'Network Setup',
+            description: 'Professional network setup and troubleshooting services.'
+        },
+        {
+            icon: 'fas fa-tools',
+            title: 'Maintenance',
+            description: 'Regular maintenance services to keep your systems running smoothly.'
+        }
+    ];
+    
         createServiceCards(services);
     }
 }
@@ -545,30 +545,30 @@ function loadProductsFromLocalStorage() {
     
     // Fallback function to use localStorage if API fails
     function fallbackToLocalStorage() {
-        // Get products from localStorage or use default ones
-        const products = JSON.parse(localStorage.getItem('products')) || [
-            {
-                image: 'images/laptop1.jpg',
-                title: 'Premium Laptops',
-                description: 'High-performance laptops for professionals and gamers'
-            },
-            {
-                image: 'images/desktop1.jpg',
-                title: 'Desktop Systems',
-                description: 'Powerful desktop computers for every need'
-            },
-            {
-                image: 'images/parts1.jpg',
-                title: 'Computer Parts',
-                description: 'Quality components for upgrades and repairs'
-            },
-            {
-                image: 'images/accessories1.jpg',
-                title: 'Accessories',
-                description: 'Wide range of accessories to enhance your computing experience'
-            }
-        ];
-        
+    // Get products from localStorage or use default ones
+    const products = JSON.parse(localStorage.getItem('products')) || [
+        {
+            image: 'images/laptop1.jpg',
+            title: 'Premium Laptops',
+            description: 'High-performance laptops for professionals and gamers'
+        },
+        {
+            image: 'images/desktop1.jpg',
+            title: 'Desktop Systems',
+            description: 'Powerful desktop computers for every need'
+        },
+        {
+            image: 'images/parts1.jpg',
+            title: 'Computer Parts',
+            description: 'Quality components for upgrades and repairs'
+        },
+        {
+            image: 'images/accessories1.jpg',
+            title: 'Accessories',
+            description: 'Wide range of accessories to enhance your computing experience'
+        }
+    ];
+    
         createProductCards(products);
     }
 }
@@ -616,19 +616,19 @@ function initializeGoogleMap() {
         // Helper function to update map display
         function updateMapDisplay(mapSettings) {
             // Insert the iframe code directly if it exists and is not empty
-            if (mapSettings.iframeCode && mapSettings.iframeCode.trim() !== '') {
-                mapContainer.innerHTML = mapSettings.iframeCode;
-            } else {
-                mapContainer.innerHTML = '<p>No map available</p>';
-            }
-            
+    if (mapSettings.iframeCode && mapSettings.iframeCode.trim() !== '') {
+        mapContainer.innerHTML = mapSettings.iframeCode;
+    } else {
+        mapContainer.innerHTML = '<p>No map available</p>';
+    }
+    
             // Create directions link if the URL exists
             if (mapSettings.directionsUrl && mapSettings.directionsUrl.trim() !== '') {
-                directionsLink.innerHTML = `
-                    <a href="${mapSettings.directionsUrl}" target="_blank" rel="noopener noreferrer">
-                        <i class="fas fa-directions"></i> Get Directions
-                    </a>
-                `;
+    directionsLink.innerHTML = `
+        <a href="${mapSettings.directionsUrl}" target="_blank" rel="noopener noreferrer">
+            <i class="fas fa-directions"></i> Get Directions
+        </a>
+    `;
             } else {
                 directionsLink.innerHTML = '';
             }
@@ -678,14 +678,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             if (password === storedPassword) {
                                 sessionStorage.setItem('adminLoggedIn', 'true');
-                                window.location.href = 'admin.html';
-                            } else {
-                                alert('Incorrect password');
-                            }
-                        }
-                    });
+                    window.location.href = 'admin.html';
+                } else {
+                    alert('Incorrect password');
+                }
             }
         });
+    }
+}); 
     }
 });
 
