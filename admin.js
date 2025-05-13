@@ -87,17 +87,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Call the updateAdminPassword function from script.js
-            if (typeof updateAdminPassword === 'function') {
-                if (updateAdminPassword(currentPassword, newPassword)) {
+            // Show loading state
+            const submitBtn = adminPasswordForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.textContent;
+            submitBtn.textContent = 'Changing Password...';
+            submitBtn.disabled = true;
+            
+            // First try API endpoint
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    currentPassword: currentPassword,
+                    password: newPassword
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Also update in localStorage as fallback
+                    localStorage.setItem('adminPassword', newPassword);
+                    
                     showNotification('Password changed successfully');
+                    adminPasswordForm.reset();
+                } else {
+                    throw new Error(data.error || 'Failed to change password');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating password via API:', error);
+                
+                // Fall back to local storage method if API fails
+                if (updateAdminPassword(currentPassword, newPassword)) {
+                    showNotification('Password changed successfully (local only)');
                     adminPasswordForm.reset();
                 } else {
                     alert('Current password is incorrect');
                 }
-            } else {
-                alert('Password change function not available');
-            }
+            })
+            .finally(() => {
+                // Reset button state
+                submitBtn.textContent = originalBtnText;
+                submitBtn.disabled = false;
+            });
         });
     }
 
@@ -113,13 +147,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Business Information Functions
 function loadBusinessInfo() {
-    const businessInfo = JSON.parse(localStorage.getItem('businessInfo')) || {};
-    
-    if (businessInfo.name) document.getElementById('businessName').value = businessInfo.name;
-    if (businessInfo.address) document.getElementById('businessAddress').value = businessInfo.address;
-    if (businessInfo.phone) document.getElementById('businessPhone').value = businessInfo.phone;
-    if (businessInfo.email) document.getElementById('businessEmail').value = businessInfo.email;
-    if (businessInfo.hours) document.getElementById('businessHours').value = businessInfo.hours;
+    // Try to get data from API first
+    fetch('/api/settings')
+        .then(response => response.json())
+        .then(data => {
+            if (data.businessInfo) {
+                const businessInfo = data.businessInfo;
+                if (businessInfo.name) document.getElementById('businessName').value = businessInfo.name;
+                if (businessInfo.address) document.getElementById('businessAddress').value = businessInfo.address;
+                if (businessInfo.phone) document.getElementById('businessPhone').value = businessInfo.phone;
+                if (businessInfo.email) document.getElementById('businessEmail').value = businessInfo.email;
+                if (businessInfo.hours) document.getElementById('businessHours').value = businessInfo.hours;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading business info from API:', error);
+            
+            // Fall back to localStorage if API fails
+            const businessInfo = JSON.parse(localStorage.getItem('businessInfo')) || {};
+            
+            if (businessInfo.name) document.getElementById('businessName').value = businessInfo.name;
+            if (businessInfo.address) document.getElementById('businessAddress').value = businessInfo.address;
+            if (businessInfo.phone) document.getElementById('businessPhone').value = businessInfo.phone;
+            if (businessInfo.email) document.getElementById('businessEmail').value = businessInfo.email;
+            if (businessInfo.hours) document.getElementById('businessHours').value = businessInfo.hours;
+        });
 }
 
 function saveBusinessInfo() {
@@ -131,17 +183,56 @@ function saveBusinessInfo() {
         hours: document.getElementById('businessHours').value
     };
     
-    localStorage.setItem('businessInfo', JSON.stringify(businessInfo));
+    // Save to API first
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ businessInfo })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to save business info');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving business info to API:', error);
+        // Show a notification that it was saved locally only
+        showNotification('Business information saved locally only. Some server error occurred.');
+    })
+    .finally(() => {
+        // Also save to localStorage as a fallback
+        localStorage.setItem('businessInfo', JSON.stringify(businessInfo));
+    });
 }
 
 // Social Media Functions
 function loadSocialMedia() {
-    const socialMedia = JSON.parse(localStorage.getItem('socialMedia')) || {};
-    
-    if (socialMedia.facebook) document.getElementById('facebookLink').value = socialMedia.facebook;
-    if (socialMedia.twitter) document.getElementById('twitterLink').value = socialMedia.twitter;
-    if (socialMedia.instagram) document.getElementById('instagramLink').value = socialMedia.instagram;
-    if (socialMedia.linkedin) document.getElementById('linkedinLink').value = socialMedia.linkedin;
+    // Try to get data from API first
+    fetch('/api/settings')
+        .then(response => response.json())
+        .then(data => {
+            if (data.socialMedia) {
+                const socialMedia = data.socialMedia;
+                if (socialMedia.facebook) document.getElementById('facebookLink').value = socialMedia.facebook;
+                if (socialMedia.twitter) document.getElementById('twitterLink').value = socialMedia.twitter;
+                if (socialMedia.instagram) document.getElementById('instagramLink').value = socialMedia.instagram;
+                if (socialMedia.linkedin) document.getElementById('linkedinLink').value = socialMedia.linkedin;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading social media from API:', error);
+            
+            // Fall back to localStorage if API fails
+            const socialMedia = JSON.parse(localStorage.getItem('socialMedia')) || {};
+            
+            if (socialMedia.facebook) document.getElementById('facebookLink').value = socialMedia.facebook;
+            if (socialMedia.twitter) document.getElementById('twitterLink').value = socialMedia.twitter;
+            if (socialMedia.instagram) document.getElementById('instagramLink').value = socialMedia.instagram;
+            if (socialMedia.linkedin) document.getElementById('linkedinLink').value = socialMedia.linkedin;
+        });
 }
 
 function saveSocialMedia() {
@@ -152,7 +243,29 @@ function saveSocialMedia() {
         linkedin: document.getElementById('linkedinLink').value
     };
     
-    localStorage.setItem('socialMedia', JSON.stringify(socialMedia));
+    // Save to API first
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ socialMedia })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to save social media');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving social media to API:', error);
+        // Show a notification that it was saved locally only
+        showNotification('Social media links saved locally only. Some server error occurred.');
+    })
+    .finally(() => {
+        // Also save to localStorage as a fallback
+        localStorage.setItem('socialMedia', JSON.stringify(socialMedia));
+    });
 }
 
 // Services Management
@@ -296,6 +409,9 @@ function addServiceEventListeners() {
                 // Save updated services
                 localStorage.setItem('services', JSON.stringify(services));
                 
+                // Sync with server
+                syncWithServer('services', services);
+                
                 // Reload services
                 loadServices();
                 showNotification('Service deleted successfully');
@@ -329,6 +445,9 @@ function addServiceEventListeners() {
             // Save updated services
             localStorage.setItem('services', JSON.stringify(services));
             
+            // Sync with server
+            syncWithServer('services', services);
+            
             // Hide details
             serviceItem.querySelector('.service-details').style.display = 'none';
             
@@ -352,6 +471,9 @@ function addNewService() {
     
     // Save updated services
     localStorage.setItem('services', JSON.stringify(services));
+    
+    // Sync with server
+    syncWithServer('services', services);
     
     // Reload services
     loadServices();
@@ -491,6 +613,9 @@ function addProductEventListeners() {
                 // Save updated products
                 localStorage.setItem('products', JSON.stringify(products));
                 
+                // Sync with server
+                syncWithServer('products', products);
+                
                 // Reload products
                 loadProducts();
                 showNotification('Product deleted successfully');
@@ -537,6 +662,9 @@ function addProductEventListeners() {
                     // Save updated products
                     localStorage.setItem('products', JSON.stringify(products));
                     
+                    // Sync with server
+                    syncWithServer('products', products);
+                    
                     // Hide details
                     productItem.querySelector('.product-details').style.display = 'none';
                     
@@ -559,6 +687,9 @@ function addProductEventListeners() {
                 
                 // Save updated products
                 localStorage.setItem('products', JSON.stringify(products));
+                
+                // Sync with server
+                syncWithServer('products', products);
                 
                 // Hide details
                 productItem.querySelector('.product-details').style.display = 'none';
@@ -601,6 +732,9 @@ function addNewProduct() {
     
     // Save updated products
     localStorage.setItem('products', JSON.stringify(products));
+    
+    // Sync with server
+    syncWithServer('products', products);
     
     // Reload products
     loadProducts();
@@ -659,6 +793,9 @@ function saveMapSettings() {
     };
     
     localStorage.setItem('mapSettings', JSON.stringify(mapSettings));
+    
+    // Sync with server
+    syncWithServer('mapSettings', mapSettings);
 }
 
 function updateMapPreview() {
@@ -705,11 +842,65 @@ function showNotification(message) {
 // Function to update admin password
 function updateAdminPassword(oldPassword, newPassword) {
     // Get stored password or use default
-    const storedPassword = localStorage.getItem('adminPassword') || 'admin123';
+    const storedPassword = localStorage.getItem('adminPassword') || 'admin@123';
     
     if (oldPassword === storedPassword) {
         localStorage.setItem('adminPassword', newPassword);
+        
+        // Sync with server
+        syncWithServer('password', { password: newPassword });
         return true;
     }
     return false;
+}
+
+// Function to sync data with server
+function syncWithServer(dataType, data) {
+    // Check if we're running on a local environment
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' ||
+                        window.location.hostname.includes('192.168.');
+    
+    if (isLocalhost) {
+        console.log(`Local development: would sync ${dataType} with server`, data);
+        return;
+    }
+    
+    // Create a backup of the data
+    const timestamp = new Date().toISOString();
+    const backupKey = `${dataType}_backup_${timestamp}`;
+    localStorage.setItem(backupKey, JSON.stringify(data));
+    
+    // In a production environment, this would be where you'd make a fetch call
+    // to your backend API to save the data
+    /*
+    fetch('/api/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            type: dataType,
+            data: data,
+            timestamp: timestamp
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Server sync failed');
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Success:', data);
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        showNotification('Failed to sync with server. Changes are saved locally only.');
+    });
+    */
+    
+    // For now, we'll simulate a server sync with a message
+    console.log(`Syncing ${dataType} with server...`);
+    alert('IMPORTANT: You need to set up a server backend to store changes globally across devices. Current changes are saved to this device only.');
 } 

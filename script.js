@@ -283,7 +283,7 @@ function loadBrandingFromLocalStorage() {
     }
 }
 
-// Function to load business information from localStorage
+// Function to load business information from API or localStorage
 function loadBusinessInfoFromLocalStorage() {
     // Get business info elements
     const addressElement = document.querySelector('.contact-item:nth-of-type(1) p');
@@ -293,78 +293,128 @@ function loadBusinessInfoFromLocalStorage() {
     
     if (!addressElement || !phoneElement || !emailElement || !hoursElements.length) return;
     
-    // Get business info from localStorage or use defaults
-    const businessInfo = JSON.parse(localStorage.getItem('businessInfo')) || {
-        name: 'Mahatma Enterprise',
-        address: '123 Tech Street, Digital City, 12345',
-        phone: '+1 (555) 123-4567',
-        email: 'info@mahatmaenterprise.com',
-        hours: 'Monday - Friday: 9am - 6pm\nSaturday: 10am - 4pm\nSunday: Closed'
-    };
-    
-    // Update contact information in the page
-    addressElement.textContent = businessInfo.address;
-    phoneElement.textContent = businessInfo.phone;
-    emailElement.textContent = businessInfo.email;
-    
-    // Update business hours
-    const hoursLines = businessInfo.hours.split('\n');
-    if (hoursLines.length > 0) {
-        // If we have more lines than paragraph elements, create additional ones
-        if (hoursLines.length > hoursElements.length) {
-            const hoursContainer = hoursElements[0].parentNode;
-            
-            // Add additional paragraph elements for each line
-            for (let i = hoursElements.length; i < hoursLines.length; i++) {
-                const newP = document.createElement('p');
-                hoursContainer.appendChild(newP);
+    // Try to get data from the API first
+    fetch('/api/settings')
+        .then(response => response.json())
+        .then(data => {
+            if (data.businessInfo) {
+                updateBusinessInfo(data.businessInfo);
+            } else {
+                // If API doesn't return business info, fall back to localStorage
+                fallbackToLocalStorage();
             }
-            
-            // Get the updated collection of paragraph elements
-            const updatedHoursElements = hoursContainer.querySelectorAll('p');
-            
-            // Update content for each paragraph
-            hoursLines.forEach((line, index) => {
-                if (updatedHoursElements[index]) {
-                    updatedHoursElements[index].textContent = line;
+        })
+        .catch(error => {
+            console.error('Error loading business info from API:', error);
+            // Fall back to localStorage if API fails
+            fallbackToLocalStorage();
+        });
+    
+    // Helper function to update UI with business info
+    function updateBusinessInfo(businessInfo) {
+        // Update contact information in the page
+        addressElement.textContent = businessInfo.address || '123 Tech Street, Digital City, 12345';
+        phoneElement.textContent = businessInfo.phone || '+1 (555) 123-4567';
+        emailElement.textContent = businessInfo.email || 'info@mahatmaenterprise.com';
+        
+        // Update business hours
+        const hoursLines = (businessInfo.hours || 'Monday - Friday: 9am - 6pm\nSaturday: 10am - 4pm\nSunday: Closed').split('\n');
+        if (hoursLines.length > 0) {
+            // If we have more lines than paragraph elements, create additional ones
+            if (hoursLines.length > hoursElements.length) {
+                const hoursContainer = hoursElements[0].parentNode;
+                
+                // Add additional paragraph elements for each line
+                for (let i = hoursElements.length; i < hoursLines.length; i++) {
+                    const newP = document.createElement('p');
+                    hoursContainer.appendChild(newP);
                 }
-            });
-        } else {
-            // We have enough or exactly the right number of paragraph elements
-            hoursLines.forEach((line, index) => {
-                if (hoursElements[index]) {
-                    hoursElements[index].textContent = line;
-                }
-            });
+                
+                // Get the updated collection of paragraph elements
+                const updatedHoursElements = hoursContainer.querySelectorAll('p');
+                
+                // Update content for each paragraph
+                hoursLines.forEach((line, index) => {
+                    if (updatedHoursElements[index]) {
+                        updatedHoursElements[index].textContent = line;
+                    }
+                });
+            } else {
+                // We have enough or exactly the right number of paragraph elements
+                hoursLines.forEach((line, index) => {
+                    if (hoursElements[index]) {
+                        hoursElements[index].textContent = line;
+                    }
+                });
+            }
         }
+        
+        // Update page title if necessary
+        document.title = `${businessInfo.name || 'Mahatma Enterprise'} - Computer & Laptop Sales and Service`;
     }
     
-    // Update page title if necessary
-    document.title = `${businessInfo.name} - Computer & Laptop Sales and Service`;
+    // Fallback function to use localStorage if API fails
+    function fallbackToLocalStorage() {
+        // Get business info from localStorage or use defaults
+        const businessInfo = JSON.parse(localStorage.getItem('businessInfo')) || {
+            name: 'Mahatma Enterprise',
+            address: '123 Tech Street, Digital City, 12345',
+            phone: '+1 (555) 123-4567',
+            email: 'info@mahatmaenterprise.com',
+            hours: 'Monday - Friday: 9am - 6pm\nSaturday: 10am - 4pm\nSunday: Closed'
+        };
+        
+        updateBusinessInfo(businessInfo);
+    }
 }
 
-// Function to load social media links from localStorage
+// Function to load social media links from API or localStorage
 function loadSocialMediaLinksFromLocalStorage() {
     const socialIcons = document.querySelectorAll('.social-icons a');
     if (!socialIcons.length) return;
     
-    // Get social media links from localStorage or use defaults
-    const socialMedia = JSON.parse(localStorage.getItem('socialMedia')) || {
-        facebook: 'https://facebook.com/',
-        twitter: 'https://twitter.com/',
-        instagram: 'https://instagram.com/',
-        linkedin: 'https://linkedin.com/'
-    };
+    // Try to get data from API first
+    fetch('/api/settings')
+        .then(response => response.json())
+        .then(data => {
+            if (data.socialMedia) {
+                updateSocialMediaLinks(data.socialMedia);
+            } else {
+                // If API doesn't return social media, fall back to localStorage
+                fallbackToLocalStorage();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading social media from API:', error);
+            // Fall back to localStorage if API fails
+            fallbackToLocalStorage();
+        });
     
-    // Update href attributes for social media icons
-    // Assuming the order is: Facebook, Twitter, Instagram, LinkedIn
-    if (socialIcons[0]) socialIcons[0].href = socialMedia.facebook;
-    if (socialIcons[1]) socialIcons[1].href = socialMedia.twitter;
-    if (socialIcons[2]) socialIcons[2].href = socialMedia.instagram;
-    if (socialIcons[3]) socialIcons[3].href = socialMedia.linkedin;
+    // Helper function to update UI with social media links
+    function updateSocialMediaLinks(socialMedia) {
+        // Update href attributes for social media icons
+        // Assuming the order is: Facebook, Twitter, Instagram, LinkedIn
+        if (socialIcons[0]) socialIcons[0].href = socialMedia.facebook || 'https://facebook.com/';
+        if (socialIcons[1]) socialIcons[1].href = socialMedia.twitter || 'https://twitter.com/';
+        if (socialIcons[2]) socialIcons[2].href = socialMedia.instagram || 'https://instagram.com/';
+        if (socialIcons[3]) socialIcons[3].href = socialMedia.linkedin || 'https://linkedin.com/';
+    }
+    
+    // Fallback function to use localStorage if API fails
+    function fallbackToLocalStorage() {
+        // Get social media links from localStorage or use defaults
+        const socialMedia = JSON.parse(localStorage.getItem('socialMedia')) || {
+            facebook: 'https://facebook.com/',
+            twitter: 'https://twitter.com/',
+            instagram: 'https://instagram.com/',
+            linkedin: 'https://linkedin.com/'
+        };
+        
+        updateSocialMediaLinks(socialMedia);
+    }
 }
 
-// Function to load services from localStorage
+// Function to load services from API or localStorage
 function loadServicesFromLocalStorage() {
     const servicesGrid = document.querySelector('.services-grid');
     if (!servicesGrid) return;
@@ -372,56 +422,81 @@ function loadServicesFromLocalStorage() {
     // Clear existing content
     servicesGrid.innerHTML = '';
     
-    // Get services from localStorage or use default ones
-    const services = JSON.parse(localStorage.getItem('services')) || [
-        {
-            icon: 'fas fa-laptop',
-            title: 'Laptop Repair',
-            description: 'Professional laptop repair services with quick turnaround time.'
-        },
-        {
-            icon: 'fas fa-desktop',
-            title: 'Computer Sales',
-            description: 'Wide range of computers and laptops for personal and business use.'
-        },
-        {
-            icon: 'fas fa-microchip',
-            title: 'Parts & Accessories',
-            description: 'Quality computer parts and accessories from trusted brands.'
-        },
-        {
-            icon: 'fas fa-virus-slash',
-            title: 'Virus Removal',
-            description: 'Effective virus and malware removal services for your devices.'
-        },
-        {
-            icon: 'fas fa-network-wired',
-            title: 'Network Setup',
-            description: 'Professional network setup and troubleshooting services.'
-        },
-        {
-            icon: 'fas fa-tools',
-            title: 'Maintenance',
-            description: 'Regular maintenance services to keep your systems running smoothly.'
-        }
-    ];
+    // Try to get data from API first
+    fetch('/api/content')
+        .then(response => response.json())
+        .then(data => {
+            if (data.services && Array.isArray(data.services)) {
+                createServiceCards(data.services);
+            } else {
+                // If API doesn't return services, fall back to localStorage
+                fallbackToLocalStorage();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading services from API:', error);
+            // Fall back to localStorage if API fails
+            fallbackToLocalStorage();
+        });
     
-    // Create service cards
-    services.forEach(service => {
-        const serviceCard = document.createElement('div');
-        serviceCard.className = 'service-card';
+    // Helper function to create service cards
+    function createServiceCards(services) {
+        // Create service cards
+        services.forEach(service => {
+            const serviceCard = document.createElement('div');
+            serviceCard.className = 'service-card';
+            
+            serviceCard.innerHTML = `
+                <i class="${service.icon || 'fas fa-laptop'}"></i>
+                <h3>${service.title || 'Service'}</h3>
+                <p>${service.description || 'Service description'}</p>
+            `;
+            
+            servicesGrid.appendChild(serviceCard);
+        });
+    }
+    
+    // Fallback function to use localStorage if API fails
+    function fallbackToLocalStorage() {
+        // Get services from localStorage or use default ones
+        const services = JSON.parse(localStorage.getItem('services')) || [
+            {
+                icon: 'fas fa-laptop',
+                title: 'Laptop Repair',
+                description: 'Professional laptop repair services with quick turnaround time.'
+            },
+            {
+                icon: 'fas fa-desktop',
+                title: 'Computer Sales',
+                description: 'Wide range of computers and laptops for personal and business use.'
+            },
+            {
+                icon: 'fas fa-microchip',
+                title: 'Parts & Accessories',
+                description: 'Quality computer parts and accessories from trusted brands.'
+            },
+            {
+                icon: 'fas fa-virus-slash',
+                title: 'Virus Removal',
+                description: 'Effective virus and malware removal services for your devices.'
+            },
+            {
+                icon: 'fas fa-network-wired',
+                title: 'Network Setup',
+                description: 'Professional network setup and troubleshooting services.'
+            },
+            {
+                icon: 'fas fa-tools',
+                title: 'Maintenance',
+                description: 'Regular maintenance services to keep your systems running smoothly.'
+            }
+        ];
         
-        serviceCard.innerHTML = `
-            <i class="${service.icon}"></i>
-            <h3>${service.title}</h3>
-            <p>${service.description}</p>
-        `;
-        
-        servicesGrid.appendChild(serviceCard);
-    });
+        createServiceCards(services);
+    }
 }
 
-// Function to load products from localStorage
+// Function to load products from API or localStorage
 function loadProductsFromLocalStorage() {
     const productsSlider = document.querySelector('.products-slider');
     if (!productsSlider) return;
@@ -429,55 +504,73 @@ function loadProductsFromLocalStorage() {
     // Clear existing content
     productsSlider.innerHTML = '';
     
-    // Get products from localStorage or use default ones
-    const products = JSON.parse(localStorage.getItem('products')) || [
-        {
-            image: 'images/laptop1.jpg',
-            title: 'Premium Laptops',
-            description: 'High-performance laptops for professionals and gamers'
-        },
-        {
-            image: 'images/desktop1.jpg',
-            title: 'Desktop Systems',
-            description: 'Powerful desktop computers for every need'
-        },
-        {
-            image: 'images/parts1.jpg',
-            title: 'Computer Parts',
-            description: 'Quality components for upgrades and repairs'
-        },
-        {
-            image: 'images/accessories1.jpg',
-            title: 'Accessories',
-            description: 'Wide range of accessories to enhance your computing experience'
-        }
-    ];
+    // Try to get data from API first
+    fetch('/api/content')
+        .then(response => response.json())
+        .then(data => {
+            if (data.products && Array.isArray(data.products)) {
+                createProductCards(data.products);
+            } else {
+                // If API doesn't return products, fall back to localStorage
+                fallbackToLocalStorage();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading products from API:', error);
+            // Fall back to localStorage if API fails
+            fallbackToLocalStorage();
+        });
     
-    // Function to handle image loading errors
-    function handleImageError(img, title) {
-        // Fallback to a placeholder image or use a different approach
-        img.src = 'https://via.placeholder.com/500x300?text=' + encodeURIComponent(title);
-        console.error(`Failed to load product image for "${title}"`);
+    // Helper function to create product cards
+    function createProductCards(products) {
+        // Create product cards
+        products.forEach(product => {
+            const productCard = document.createElement('div');
+            productCard.className = 'product-card';
+            
+            // Use default image if none provided
+            const imageSrc = product.image || 'images/placeholder.jpg';
+            const safeTitle = product.title || 'Product';
+            
+            // Create the HTML structure
+            productCard.innerHTML = `
+                <img src="${imageSrc}" alt="${safeTitle}" onerror="this.onerror=null; this.src='https://via.placeholder.com/500x300?text=${encodeURIComponent(safeTitle)}';">
+                <h3>${safeTitle}</h3>
+                <p>${product.description || 'No description available'}</p>
+            `;
+            
+            productsSlider.appendChild(productCard);
+        });
     }
     
-    // Create product cards
-    products.forEach(product => {
-        const productCard = document.createElement('div');
-        productCard.className = 'product-card';
+    // Fallback function to use localStorage if API fails
+    function fallbackToLocalStorage() {
+        // Get products from localStorage or use default ones
+        const products = JSON.parse(localStorage.getItem('products')) || [
+            {
+                image: 'images/laptop1.jpg',
+                title: 'Premium Laptops',
+                description: 'High-performance laptops for professionals and gamers'
+            },
+            {
+                image: 'images/desktop1.jpg',
+                title: 'Desktop Systems',
+                description: 'Powerful desktop computers for every need'
+            },
+            {
+                image: 'images/parts1.jpg',
+                title: 'Computer Parts',
+                description: 'Quality components for upgrades and repairs'
+            },
+            {
+                image: 'images/accessories1.jpg',
+                title: 'Accessories',
+                description: 'Wide range of accessories to enhance your computing experience'
+            }
+        ];
         
-        // Use default image if none provided
-        const imageSrc = product.image || 'images/placeholder.jpg';
-        const safeTitle = product.title || 'Product';
-        
-        // Create the HTML structure
-        productCard.innerHTML = `
-            <img src="${imageSrc}" alt="${safeTitle}" onerror="this.onerror=null; this.src='https://via.placeholder.com/500x300?text=${encodeURIComponent(safeTitle)}';">
-            <h3>${safeTitle}</h3>
-            <p>${product.description || 'No description available'}</p>
-        `;
-        
-        productsSlider.appendChild(productCard);
-    });
+        createProductCards(products);
+    }
 }
 
 // Function to check if today's background has already been set
@@ -500,7 +593,7 @@ function setTodaysBackground(backgroundUrl) {
     localStorage.setItem('todaysBackground', backgroundUrl);
 }
 
-// Function to initialize Google Map from localStorage settings
+// Function to initialize Google Map from API or localStorage settings
 function initializeGoogleMap() {
     const mapContainer = document.getElementById('googleMapContainer');
     const directionsLink = document.getElementById('mapDirectionsLink');
@@ -508,28 +601,48 @@ function initializeGoogleMap() {
     if (!mapContainer || !directionsLink) return;
     
     try {
-        // Get map settings from localStorage or use defaults
-        const mapSettings = JSON.parse(localStorage.getItem('mapSettings')) || {
-            iframeCode: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3703.493925964318!2d73.719295!3d21.8384759!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39601d55e43af21f%3A0xb8e23c01a1f6eb18!2sStatue%20Of%20Unity!5e0!3m2!1sen!2sin!4v1747137082051!5m2!1sen!2sin" width="80%" height="220" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>',
-            directionsUrl: 'https://goo.gl/maps/Pof8eHp1tpyZmPAt8'
-        };
+        // Try to get data from API first
+        fetch('/api/map')
+            .then(response => response.json())
+            .then(mapSettings => {
+                updateMapDisplay(mapSettings);
+            })
+            .catch(error => {
+                console.error('Error loading map settings from API:', error);
+                // Fall back to localStorage if API fails
+                fallbackToLocalStorage();
+            });
         
-        // Insert the iframe code directly if it exists and is not empty
-        if (mapSettings.iframeCode && mapSettings.iframeCode.trim() !== '') {
-            mapContainer.innerHTML = mapSettings.iframeCode;
-        } else {
-            mapContainer.innerHTML = '<p>No map available</p>';
+        // Helper function to update map display
+        function updateMapDisplay(mapSettings) {
+            // Insert the iframe code directly if it exists and is not empty
+            if (mapSettings.iframeCode && mapSettings.iframeCode.trim() !== '') {
+                mapContainer.innerHTML = mapSettings.iframeCode;
+            } else {
+                mapContainer.innerHTML = '<p>No map available</p>';
+            }
+            
+            // Create directions link if the URL exists
+            if (mapSettings.directionsUrl && mapSettings.directionsUrl.trim() !== '') {
+                directionsLink.innerHTML = `
+                    <a href="${mapSettings.directionsUrl}" target="_blank" rel="noopener noreferrer">
+                        <i class="fas fa-directions"></i> Get Directions
+                    </a>
+                `;
+            } else {
+                directionsLink.innerHTML = '';
+            }
         }
         
-        // Create directions link if the URL exists
-        if (mapSettings.directionsUrl && mapSettings.directionsUrl.trim() !== '') {
-            directionsLink.innerHTML = `
-                <a href="${mapSettings.directionsUrl}" target="_blank" rel="noopener noreferrer">
-                    <i class="fas fa-directions"></i> Get Directions
-                </a>
-            `;
-        } else {
-            directionsLink.innerHTML = '';
+        // Fallback function to use localStorage if API fails
+        function fallbackToLocalStorage() {
+            // Get map settings from localStorage or use defaults
+            const mapSettings = JSON.parse(localStorage.getItem('mapSettings')) || {
+                iframeCode: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3703.493925964318!2d73.719295!3d21.8384759!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39601d55e43af21f%3A0xb8e23c01a1f6eb18!2sStatue%20Of%20Unity!5e0!3m2!1sen!2sin!4v1747137082051!5m2!1sen!2sin" width="80%" height="220" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>',
+                directionsUrl: 'https://goo.gl/maps/Pof8eHp1tpyZmPAt8'
+            };
+            
+            updateMapDisplay(mapSettings);
         }
     } catch (error) {
         console.error('Error initializing Google Map:', error);
@@ -551,20 +664,70 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 const password = prompt('Please enter admin password:');
                 
-                // Get stored password or use default
-                const storedPassword = localStorage.getItem('adminPassword') || 'admin123';
+                if (!password) return; // User cancelled the prompt
                 
-                // Check password
-                if (password === storedPassword) {
-                    sessionStorage.setItem('adminLoggedIn', 'true');
-                    window.location.href = 'admin.html';
-                } else {
-                    alert('Incorrect password');
-                }
+                // First try to authenticate with server (in a real implementation)
+                tryServerAuth(password)
+                    .then(success => {
+                        if (success) {
+                            sessionStorage.setItem('adminLoggedIn', 'true');
+                            window.location.href = 'admin.html';
+                        } else {
+                            // Fall back to local auth if server auth fails
+                            const storedPassword = localStorage.getItem('adminPassword') || 'admin@123';
+                            
+                            if (password === storedPassword) {
+                                sessionStorage.setItem('adminLoggedIn', 'true');
+                                window.location.href = 'admin.html';
+                            } else {
+                                alert('Incorrect password');
+                            }
+                        }
+                    });
             }
         });
     }
 });
+
+// Simulate server authentication - in a real app, this would make an API call
+function tryServerAuth(password) {
+    // This is a placeholder for a real server authentication
+    // In a real implementation, this would be a fetch call to your authentication endpoint
+    
+    return new Promise((resolve) => {
+        // Simulate network delay
+        setTimeout(() => {
+            // For now, always fall back to local auth
+            resolve(false);
+            
+            /* In a real implementation, this would be:
+            fetch('/api/admin/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: password })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json().then(data => {
+                        // Save auth token if provided
+                        if (data.token) {
+                            sessionStorage.setItem('authToken', data.token);
+                        }
+                        resolve(true);
+                    });
+                } else {
+                    resolve(false);
+                }
+            })
+            .catch(() => {
+                resolve(false);
+            });
+            */
+        }, 300);
+    });
+}
 
 // Function to update admin password
 function updateAdminPassword(oldPassword, newPassword) {
@@ -573,7 +736,53 @@ function updateAdminPassword(oldPassword, newPassword) {
     
     if (oldPassword === storedPassword) {
         localStorage.setItem('adminPassword', newPassword);
+        
+        // This would sync with server in a real implementation
+        syncPasswordWithServer(newPassword);
         return true;
     }
     return false;
+}
+
+// Function to sync password with server
+function syncPasswordWithServer(newPassword) {
+    // Check if we're running on a local environment
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1' ||
+                      window.location.hostname.includes('192.168.');
+    
+    if (isLocalhost) {
+        console.log('Local development: would sync password with server');
+        return;
+    }
+    
+    console.log('Syncing password with server...');
+    
+    // In a real implementation, this would be:
+    /*
+    fetch('/api/admin/password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionStorage.getItem('authToken')
+        },
+        body: JSON.stringify({ password: newPassword })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to update password on server');
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Password updated on server');
+    })
+    .catch(error => {
+        console.error('Error updating password on server:', error);
+        alert('Your password was changed on this device but failed to update on the server. Other devices will still use the old password.');
+    });
+    */
+    
+    // For now, we'll simulate a server sync with a message
+    alert('IMPORTANT: You need to set up a server backend to store the password globally. Current password is saved to this device only.');
 } 
