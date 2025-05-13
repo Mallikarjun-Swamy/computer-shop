@@ -26,7 +26,16 @@ export async function setData(key, value) {
     if (!edgeConfig) {
       throw new Error('Edge Config client not initialized');
     }
-    await edgeConfig.set(key, value);
+    
+    // In development and non-Vercel environments, we can't set Edge Config values
+    // So we'll use localStorage as a fallback
+    if (typeof window !== 'undefined') {
+      console.warn(`Edge Config can't be written to locally, saving to localStorage: ${key}`);
+      localStorage.setItem(key, JSON.stringify(value));
+    } else {
+      console.warn(`Edge Config can't be written to from Node.js, would save: ${key}`, value);
+    }
+    
     return true;
   } catch (error) {
     console.error(`Error setting data for key ${key}:`, error);

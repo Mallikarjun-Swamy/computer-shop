@@ -1,0 +1,17 @@
+{
+  "adminPassword": "admin@123",
+  "businessInfo": {
+    "name": "Mahatma Enterprise",
+    "address": "123 Tech Street, Digital City, 12345",
+    "phone": "+1 (555) 123-4567",
+    "email": "info@mahatmaenterprise.com",
+    "hours": "Monday - Friday: 9am - 6pm\nSaturday: 10am - 4pm\nSunday: Closed"
+  },
+  "socialMedia": {
+    "facebook": "https://facebook.com/",
+    "twitter": "https://twitter.com/",
+    "instagram": "https://instagram.com/",
+    "linkedin": "https://linkedin.com/"
+  },
+  "lastUpdated": "2023-10-01T12:00:00Z"
+} 

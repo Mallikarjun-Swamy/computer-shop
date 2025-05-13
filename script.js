@@ -542,10 +542,10 @@ async function checkAdminCredentials(username, password) {
         if (password === adminPassword) {
             // Set logged in status and redirect
             sessionStorage.setItem('adminLoggedIn', 'true');
-            window.location.href = 'admin.html';
-        } else {
+                    window.location.href = 'admin.html';
+                } else {
             alert('Invalid password');
-        }
+                }
     } catch (error) {
         console.error('Error checking admin credentials:', error);
         alert('An error occurred while logging in. Please try again.');

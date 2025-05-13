@@ -1,10 +1,28 @@
 // Wait for the DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if user is logged in
-    const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+    console.log('Admin page loaded - Checking auth status...');
+    
+    // Check if user is logged in using both sessionStorage and localStorage as fallback
+    const isLoggedInSession = sessionStorage.getItem('adminLoggedIn');
+    const isLoggedInLocal = localStorage.getItem('adminLoggedIn');
+    const isLoggedIn = isLoggedInSession || isLoggedInLocal;
+    
+    console.log('Auth status:', { 
+        sessionStorage: isLoggedInSession ? 'logged in' : 'not logged in', 
+        localStorage: isLoggedInLocal ? 'logged in' : 'not logged in' 
+    });
+    
     if (!isLoggedIn) {
-        window.location.href = 'index.html';
+        console.log('Not logged in - redirecting to login page');
+        window.location.href = 'login.html';
+        return; // Stop execution
     }
+    
+    console.log('Authentication successful - loading admin panel');
+    
+    // Ensure we set both storage mechanisms for robustness
+    sessionStorage.setItem('adminLoggedIn', 'true');
+    localStorage.setItem('adminLoggedIn', 'true');
     
     // Admin Tab Navigation
     const tabButtons = document.querySelectorAll('.tab-btn');
@@ -28,6 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             sessionStorage.removeItem('adminLoggedIn');
+            localStorage.removeItem('adminLoggedIn');
             window.location.href = 'index.html';
         });
     }
@@ -298,8 +317,8 @@ function initializeServicesManagement() {
     if (!servicesTab) return;
     
     // Load saved services
-    loadServices();
-    
+        loadServices();
+        
     // Add service button event listener
     const addServiceBtn = document.getElementById('addServiceBtn');
     if (addServiceBtn) {
@@ -325,13 +344,13 @@ async function loadServices() {
         
         // Display services
         servicesContainer.innerHTML = '';
-        services.forEach((service, index) => {
-            const serviceItem = createServiceItem(service, index);
+    services.forEach((service, index) => {
+        const serviceItem = createServiceItem(service, index);
             servicesContainer.appendChild(serviceItem);
-        });
-        
+    });
+    
         // Add event listeners
-        addServiceEventListeners();
+    addServiceEventListeners();
     } catch (error) {
         console.error('Failed to load services:', error);
         servicesContainer.innerHTML = '<p>Failed to load services. Please try again.</p>';
@@ -404,7 +423,7 @@ function addServiceEventListeners() {
     // Save service buttons
     document.querySelectorAll('.save-service-btn').forEach(button => {
         button.addEventListener('click', async function() {
-            const serviceItem = this.closest('.service-item');
+                const serviceItem = this.closest('.service-item');
             const index = parseInt(serviceItem.dataset.index);
             
             // Show loading state
@@ -533,7 +552,7 @@ async function addNewService() {
             
             // Hide modal and reload services
             newServiceModal.style.display = 'none';
-            loadServices();
+    loadServices();
         } catch (error) {
             console.error('Failed to add new service:', error);
             showNotification('Failed to add new service', 'error');
@@ -574,8 +593,8 @@ function initializeProductsManagement() {
     if (!productsTab) return;
     
     // Load saved products
-    loadProducts();
-    
+        loadProducts();
+        
     // Add product button event listener
     const addProductBtn = document.getElementById('addProductBtn');
     if (addProductBtn) {
@@ -601,13 +620,13 @@ async function loadProducts() {
         
         // Display products
         productsContainer.innerHTML = '';
-        products.forEach((product, index) => {
-            const productItem = createProductItem(product, index);
+    products.forEach((product, index) => {
+        const productItem = createProductItem(product, index);
             productsContainer.appendChild(productItem);
-        });
-        
+    });
+    
         // Add event listeners
-        addProductEventListeners();
+    addProductEventListeners();
     } catch (error) {
         console.error('Failed to load products:', error);
         productsContainer.innerHTML = '<p>Failed to load products. Please try again.</p>';
@@ -672,7 +691,7 @@ function addProductEventListeners() {
     // Cancel edit buttons
     document.querySelectorAll('.cancel-product-btn').forEach(button => {
         button.addEventListener('click', function() {
-            const productItem = this.closest('.product-item');
+                const productItem = this.closest('.product-item');
             productItem.querySelector('.product-details').style.display = 'block';
             productItem.querySelector('.product-edit-form').style.display = 'none';
             productItem.querySelector('.edit-product-btn').style.display = 'inline-block';
@@ -699,7 +718,7 @@ function addProductEventListeners() {
             }
             
             // Update the product at this index
-            products[index] = {
+                    products[index] = {
                 title: document.getElementById(`productTitle${index}`).value,
                 image: document.getElementById(`productImage${index}`).value,
                 description: document.getElementById(`productDesc${index}`).value
@@ -813,7 +832,7 @@ async function addNewProduct() {
             
             // Hide modal and reload products
             newProductModal.style.display = 'none';
-            loadProducts();
+    loadProducts();
         } catch (error) {
             console.error('Failed to add new product:', error);
             showNotification('Failed to add new product', 'error');
@@ -854,8 +873,8 @@ function initializeMapSettings() {
     if (!mapSettingsTab) return;
     
     // Load map settings
-    loadMapSettings();
-    
+        loadMapSettings();
+        
     // Update preview when iframe code changes
     const iframeCodeInput = document.getElementById('mapIframe');
     if (iframeCodeInput) {

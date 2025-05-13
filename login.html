@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login | Mahatma Enterprise</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 30px;
+            background-color: rgba(18, 18, 18, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .login-logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .login-logo img {
+            max-width: 180px;
+            margin-bottom: 10px;
+        }
+        .login-title {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 30px;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: var(--text-color);
+            text-decoration: none;
+        }
+        .back-link:hover {
+            color: var(--primary-color);
+        }
+        /* Notification styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 20px;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            max-width: 90%;
+            text-align: center;
+        }
+        .notification.error {
+            background-color: #f44336;
+        }
+        .notification.success {
+            background-color: #4CAF50;
+        }
+        .notification.warning {
+            background-color: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-overlay"></div>
+    
+    <!-- Notification container for showing messages -->
+    <div id="notification" class="notification" style="display: none;"></div>
+    
+    <div class="login-container">
+        <div class="login-logo">
+            <img src="images/mahatma-logo.png" alt="Mahatma Enterprise Logo">
+            <h2 class="login-title">Admin Login</h2>
+        </div>
+        
+        <form id="adminLoginForm" class="admin-form">
+            <div class="form-group">
+                <label for="adminUsername">Username</label>
+                <input type="text" id="adminUsername" required>
+            </div>
+            <div class="form-group">
+                <label for="adminPassword">Password</label>
+                <input type="password" id="adminPassword" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Website</a>
+    </div>
+    
+    <script src="script.js"></script>
+    <script src="login-handler.js"></script>
+    <script>
+        // Debug code to check login functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Login page loaded');
+            const loginForm = document.getElementById('adminLoginForm');
+            if (loginForm) {
+                console.log('Login form found');
+                loginForm.addEventListener('submit', function(e) {
+                    console.log('Login form submitted');
+                    // We're not preventing default here to let the original handler work
+                });
+            } else {
+                console.log('Login form not found');
+            }
+        });
+    </script>
+</body>
+</html> 
