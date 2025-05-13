@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const nav = document.querySelector('nav');
     
     if (mobileNavToggle) {
-        mobileNavToggle.addEventListener('click', function() {
+        mobileNavToggle.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent event from bubbling up
             nav.classList.toggle('active');
             
             // Toggle icon between bars and times
@@ -40,7 +41,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener('touchstart', function(e) {
             if (nav.classList.contains('active') && 
                 !nav.contains(e.target) && 
-                !header.contains(e.target)) {
+                !header.contains(e.target) &&
+                !mobileNavToggle.contains(e.target)) {
                 nav.classList.remove('active');
                 if (mobileNavToggle) {
                     const icon = mobileNavToggle.querySelector('i');
@@ -94,10 +96,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Preload background images for instant switching
     function preloadBackgroundImages() {
-        preloadedImages = backgroundImages.map(imgSrc => {
+        preloadedImages = [];
+        backgroundImages.forEach(imgSrc => {
             const img = new Image();
+            img.onerror = () => {
+                console.error(`Failed to load image: ${imgSrc}`);
+                // Remove failed image from array
+                const index = backgroundImages.indexOf(imgSrc);
+                if (index > -1) {
+                    backgroundImages.splice(index, 1);
+                }
+            };
+            img.onload = () => {
+                preloadedImages.push(img);
+            };
             img.src = imgSrc;
-            return img;
         });
         console.log('Background images preloaded');
     }
@@ -107,6 +120,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to change background instantly (no transition)
     function changeBackground() {
+        // Check if we have any background images
+        if (backgroundImages.length === 0) {
+            return; // No valid images to display
+        }
+        
         // Set new background image immediately
         currentIndex = (currentIndex + 1) % backgroundImages.length;
         bgOverlay.style.backgroundImage = `url('${backgroundImages[currentIndex]}')`;
@@ -170,9 +188,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 message: message
             };
             
-            // Debugging the public key
-            console.log("Using public key:", emailjs.publicKey);
-            
             // Send the email using EmailJS
             emailjs.send('service_sh62xvy', 'template_qgjwg4s', templateParams)
                 .then(function() {
@@ -186,7 +201,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .catch(function(error) {
                     console.error('Email sending failed:', error);
-                    console.log('Error details:', error.text, error.status);
                     alert('Oops! There was a problem sending your message. Please try again later or contact us directly.');
                     
                     // Reset button
@@ -439,6 +453,13 @@ function loadProductsFromLocalStorage() {
         }
     ];
     
+    // Function to handle image loading errors
+    function handleImageError(img, title) {
+        // Fallback to a placeholder image or use a different approach
+        img.src = 'https://via.placeholder.com/500x300?text=' + encodeURIComponent(title);
+        console.error(`Failed to load product image for "${title}"`);
+    }
+    
     // Create product cards
     products.forEach(product => {
         const productCard = document.createElement('div');
@@ -446,11 +467,13 @@ function loadProductsFromLocalStorage() {
         
         // Use default image if none provided
         const imageSrc = product.image || 'images/placeholder.jpg';
+        const safeTitle = product.title || 'Product';
         
+        // Create the HTML structure
         productCard.innerHTML = `
-            <img src="${imageSrc}" alt="${product.title}">
-            <h3>${product.title}</h3>
-            <p>${product.description}</p>
+            <img src="${imageSrc}" alt="${safeTitle}" onerror="this.onerror=null; this.src='https://via.placeholder.com/500x300?text=${encodeURIComponent(safeTitle)}';">
+            <h3>${safeTitle}</h3>
+            <p>${product.description || 'No description available'}</p>
         `;
         
         productsSlider.appendChild(productCard);
@@ -484,25 +507,35 @@ function initializeGoogleMap() {
     
     if (!mapContainer || !directionsLink) return;
     
-    // Get map settings from localStorage or use defaults
-    const mapSettings = JSON.parse(localStorage.getItem('mapSettings')) || {
-        iframeCode: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3703.493925964318!2d73.719295!3d21.8384759!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39601d55e43af21f%3A0xb8e23c01a1f6eb18!2sStatue%20Of%20Unity!5e0!3m2!1sen!2sin!4v1747137082051!5m2!1sen!2sin" width="80%" height="220" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>',
-        directionsUrl: 'https://goo.gl/maps/Pof8eHp1tpyZmPAt8'
-    };
-    
-    // Insert the iframe code directly
-    if (mapSettings.iframeCode && mapSettings.iframeCode.trim() !== '') {
-        mapContainer.innerHTML = mapSettings.iframeCode;
-    } else {
-        mapContainer.innerHTML = '<p>No map available</p>';
+    try {
+        // Get map settings from localStorage or use defaults
+        const mapSettings = JSON.parse(localStorage.getItem('mapSettings')) || {
+            iframeCode: '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3703.493925964318!2d73.719295!3d21.8384759!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39601d55e43af21f%3A0xb8e23c01a1f6eb18!2sStatue%20Of%20Unity!5e0!3m2!1sen!2sin!4v1747137082051!5m2!1sen!2sin" width="80%" height="220" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>',
+            directionsUrl: 'https://goo.gl/maps/Pof8eHp1tpyZmPAt8'
+        };
+        
+        // Insert the iframe code directly if it exists and is not empty
+        if (mapSettings.iframeCode && mapSettings.iframeCode.trim() !== '') {
+            mapContainer.innerHTML = mapSettings.iframeCode;
+        } else {
+            mapContainer.innerHTML = '<p>No map available</p>';
+        }
+        
+        // Create directions link if the URL exists
+        if (mapSettings.directionsUrl && mapSettings.directionsUrl.trim() !== '') {
+            directionsLink.innerHTML = `
+                <a href="${mapSettings.directionsUrl}" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-directions"></i> Get Directions
+                </a>
+            `;
+        } else {
+            directionsLink.innerHTML = '';
+        }
+    } catch (error) {
+        console.error('Error initializing Google Map:', error);
+        mapContainer.innerHTML = '<p>Error loading map</p>';
+        directionsLink.innerHTML = '';
     }
-    
-    // Create directions link
-    directionsLink.innerHTML = `
-        <a href="${mapSettings.directionsUrl}" target="_blank" rel="noopener noreferrer">
-            <i class="fas fa-directions"></i> Get Directions
-        </a>
-    `;
 }
 
 // Admin panel login handler
@@ -512,15 +545,18 @@ document.addEventListener('DOMContentLoaded', function() {
     if (adminLink) {
         adminLink.addEventListener('click', function(e) {
             // Check if user is already logged in
-            const isLoggedIn = localStorage.getItem('adminLoggedIn');
+            const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
             
             if (!isLoggedIn) {
                 e.preventDefault();
                 const password = prompt('Please enter admin password:');
                 
-                // Simple password check (in a real app, this would be server-side)
-                if (password === 'admin123') {
-                    localStorage.setItem('adminLoggedIn', 'true');
+                // Get stored password or use default
+                const storedPassword = localStorage.getItem('adminPassword') || 'admin123';
+                
+                // Check password
+                if (password === storedPassword) {
+                    sessionStorage.setItem('adminLoggedIn', 'true');
                     window.location.href = 'admin.html';
                 } else {
                     alert('Incorrect password');
@@ -528,4 +564,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-}); 
+});
+
+// Function to update admin password
+function updateAdminPassword(oldPassword, newPassword) {
+    // Check current password
+    const storedPassword = localStorage.getItem('adminPassword') || 'admin@123';
+    
+    if (oldPassword === storedPassword) {
+        localStorage.setItem('adminPassword', newPassword);
+        return true;
+    }
+    return false;
+} 

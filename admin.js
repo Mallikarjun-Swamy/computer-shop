@@ -1,7 +1,7 @@
 // Wait for the DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Check if user is logged in
-    const isLoggedIn = localStorage.getItem('adminLoggedIn');
+    const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
     if (!isLoggedIn) {
         window.location.href = 'index.html';
     }
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('adminLoggedIn');
+            sessionStorage.removeItem('adminLoggedIn');
             window.location.href = 'index.html';
         });
     }
@@ -57,6 +57,47 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             saveSocialMedia();
             showNotification('Social media links saved successfully');
+        });
+    }
+
+    // Admin Password Change Form
+    const adminPasswordForm = document.getElementById('adminPasswordForm');
+    if (adminPasswordForm) {
+        adminPasswordForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Validate passwords
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                alert('Please fill in all password fields');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                alert('New password and confirmation do not match');
+                return;
+            }
+            
+            // Check for minimum password strength
+            if (newPassword.length < 6) {
+                alert('New password must be at least 6 characters long');
+                return;
+            }
+            
+            // Call the updateAdminPassword function from script.js
+            if (typeof updateAdminPassword === 'function') {
+                if (updateAdminPassword(currentPassword, newPassword)) {
+                    showNotification('Password changed successfully');
+                    adminPasswordForm.reset();
+                } else {
+                    alert('Current password is incorrect');
+                }
+            } else {
+                alert('Password change function not available');
+            }
         });
     }
 
@@ -659,4 +700,16 @@ function showNotification(message) {
     setTimeout(() => {
         notification.classList.remove('show');
     }, 3000);
+}
+
+// Function to update admin password
+function updateAdminPassword(oldPassword, newPassword) {
+    // Get stored password or use default
+    const storedPassword = localStorage.getItem('adminPassword') || 'admin123';
+    
+    if (oldPassword === storedPassword) {
+        localStorage.setItem('adminPassword', newPassword);
+        return true;
+    }
+    return false;
 } 
